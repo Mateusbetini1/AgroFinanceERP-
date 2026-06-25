@@ -17,6 +17,7 @@ build/
 .turbo/
 .cache/
 coverage/
+*.tsbuildinfo
 
 # Logs
 logs/

@@ -85,8 +85,8 @@ export interface Account {
   bankName: string | null
   agency: string | null
   accountNumber: string | null
-  initialBalance: number
-  currentBalance: number
+  initialBalance: number | string
+  currentBalance: number | string
   active: boolean
   createdAt: string
   updatedAt: string
@@ -110,10 +110,13 @@ export interface Category {
 export interface Product {
   id: string
   name: string
+  description: string | null
   unit: string
+  categoryId: string | null
   category: { id: string; name: string; type: CategoryType } | null
   active: boolean
   createdAt: string
+  updatedAt: string
 }
 
 // ── Supplier ─────────────────────────────────────────────────────────────────
@@ -121,13 +124,13 @@ export interface Product {
 export interface Supplier {
   id: string
   name: string
-  document: string | null
+  document: string
   email: string | null
   phone: string | null
   contactName: string | null
-  address: string | null
-  active: boolean
+  notes: string | null
   createdAt: string
+  updatedAt: string
 }
 
 // ── Revenue ──────────────────────────────────────────────────────────────────
@@ -140,14 +143,14 @@ export interface Revenue {
   receivedAt: string | null
   product: { name: string }
   account: { name: string } | null
-  safra: { name: string } | null
   client: string | null
-  quantity: number
-  unitPrice: number
-  totalAmount: number
+  quantity: number | string
+  unitPrice: number | string
+  totalAmount: number | string
   status: RevenueStatus
   notes: string | null
   createdAt: string
+  updatedAt: string
 }
 
 // ── Expense ──────────────────────────────────────────────────────────────────
@@ -163,11 +166,11 @@ export interface Expense {
   category: { name: string }
   supplier: { name: string } | null
   account: { name: string } | null
-  safra: { name: string } | null
-  amount: number
+  amount: number | string
   status: ExpenseStatus
   attachmentUrl: string | null
   createdAt: string
+  updatedAt: string
 }
 
 // ── Bill ─────────────────────────────────────────────────────────────────────
@@ -181,12 +184,13 @@ export interface Bill {
   paidAt: string | null
   supplier: { name: string } | null
   account: { name: string } | null
-  amount: number
+  amount: number | string
   status: BillStatus
   installmentNumber: number | null
   installmentCount: number | null
   fileUrl: string | null
   createdAt: string
+  updatedAt: string
 }
 
 // ── Employee ─────────────────────────────────────────────────────────────────
