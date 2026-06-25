@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAuth } from '@/contexts/auth-context'
 import { PageSpinner } from '@/components/ui/spinner'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function CompanySelectPage() {
   const router = useRouter()
@@ -16,6 +16,7 @@ export default function CompanySelectPage() {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login')
     }
+
     if (!isLoading && isAuthenticated && memberships.length === 1) {
       selectMembership(memberships[0])
       router.replace('/dashboard')
@@ -27,24 +28,24 @@ export default function CompanySelectPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Selecione a empresa</CardTitle>
-        <CardDescription>Você tem acesso a múltiplas empresas. Escolha com qual deseja trabalhar.</CardDescription>
+        <CardTitle>Selecionar empresa</CardTitle>
+        <CardDescription>Escolha a empresa que deseja acessar.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {memberships.map((m) => (
+        {memberships.map((membership) => (
           <Button
-            key={m.company.id}
+            key={membership.company.id}
             variant="outline"
-            className="w-full justify-start gap-3 h-auto py-3"
+            className="h-auto w-full justify-start gap-3 py-3"
             onClick={() => {
-              selectMembership(m)
+              selectMembership(membership)
               router.push('/dashboard')
             }}
           >
             <Building2 className="h-5 w-5 shrink-0 text-primary" />
             <div className="text-left">
-              <p className="font-medium">{m.company.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</p>
+              <p className="font-medium">{membership.company.name}</p>
+              <p className="text-xs text-muted-foreground">{membership.role}</p>
             </div>
           </Button>
         ))}

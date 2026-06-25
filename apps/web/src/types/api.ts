@@ -7,10 +7,10 @@ export interface ApiResponse<T> {
 export interface PaginatedResponse<T> {
   success: boolean
   data: T[]
-  pagination: {
+  meta: {
     total: number
     page: number
-    perPage: number
+    limit: number
     totalPages: number
   }
 }
@@ -48,21 +48,30 @@ export interface LoginResponse {
 
 export interface DashboardSummary {
   totalBalance: number
-  monthRevenues: number
-  monthExpenses: number
-  pendingRevenues: number
-  pendingExpenses: number
-  overdueBills: number
-  billsDueIn7Days: number
+  revenueTotal: number
+  expenseTotal: number
+  netResult: number
+  pendingReceivables: number
+  pendingPayables: number
+  overdueTotal: number
   activeSafras: number
+  billsDueSoon: {
+    count: number
+    total: number
+  }
 }
 
 export interface CashflowItem {
   year: number
   month: number
-  revenues: number
-  expenses: number
+  inflow: number
+  outflow: number
   net: number
+  projection: {
+    pendingReceivables: number
+    pendingPayables: number
+    projectedNet: number
+  }
 }
 
 // ── Account ──────────────────────────────────────────────────────────────────

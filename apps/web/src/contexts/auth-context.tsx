@@ -8,6 +8,7 @@ interface AuthState {
   user: User | null
   membership: Membership | null
   memberships: Membership[]
+  companyId: string | null
   isLoading: boolean
   isAuthenticated: boolean
 }
@@ -20,19 +21,39 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function persistMembership(membership: Membership | null) {
+  if (!membership) {
+    localStorage.removeItem('agrofinance:membership')
+    localStorage.removeItem('agrofinance:company-id')
+    return
+  }
+
+  localStorage.setItem('agrofinance:membership', JSON.stringify(membership))
+  localStorage.setItem('agrofinance:company-id', membership.company.id)
+}
+
+function clearStoredAuth() {
+  localStorage.removeItem('agrofinance:access')
+  localStorage.removeItem('agrofinance:refresh')
+  localStorage.removeItem('agrofinance:membership')
+  localStorage.removeItem('agrofinance:company-id')
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
     membership: null,
     memberships: [],
+    companyId: null,
     isLoading: true,
     isAuthenticated: false,
   })
 
   useEffect(() => {
     const token = localStorage.getItem('agrofinance:access')
+
     if (!token) {
-      setState((s) => ({ ...s, isLoading: false }))
+      setState((current) => ({ ...current, isLoading: false }))
       return
     }
 
@@ -41,19 +62,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(({ data }) => {
         const user = data.data
         const membershipRaw = localStorage.getItem('agrofinance:membership')
-        const storedMembership = membershipRaw ? JSON.parse(membershipRaw) : null
+        const storedMembership = membershipRaw ? (JSON.parse(membershipRaw) as Membership) : null
         const membership = storedMembership ?? user.memberships?.[0] ?? null
+
+        if (membership) persistMembership(membership)
 
         setState({
           user: { id: user.id, name: user.name, email: user.email },
           membership,
           memberships: user.memberships ?? [],
+          companyId: membership?.company.id ?? null,
           isLoading: false,
           isAuthenticated: true,
         })
       })
       .catch(() => {
-        setState((s) => ({ ...s, isLoading: false }))
+        clearStoredAuth()
+        setState({
+          user: null,
+          membership: null,
+          memberships: [],
+          companyId: null,
+          isLoading: false,
+          isAuthenticated: false,
+        })
       })
   }, [])
 
@@ -62,36 +94,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('agrofinance:refresh', data.refreshToken)
 
     const membership = data.memberships[0] ?? null
-    if (membership) {
-      localStorage.setItem('agrofinance:membership', JSON.stringify(membership))
-    }
+    persistMembership(membership)
 
     setState({
       user: data.user,
       membership,
       memberships: data.memberships,
+      companyId: membership?.company.id ?? null,
       isLoading: false,
       isAuthenticated: true,
     })
   }, [])
 
   const selectMembership = useCallback((membership: Membership) => {
-    localStorage.setItem('agrofinance:membership', JSON.stringify(membership))
-    setState((s) => ({ ...s, membership }))
+    persistMembership(membership)
+    setState((current) => ({
+      ...current,
+      membership,
+      companyId: membership.company.id,
+    }))
   }, [])
 
   const logout = useCallback(async () => {
     const refreshToken = localStorage.getItem('agrofinance:refresh')
+
     try {
       if (refreshToken) await api.post('/auth/logout', { refreshToken })
-    } catch {}
-    localStorage.removeItem('agrofinance:access')
-    localStorage.removeItem('agrofinance:refresh')
-    localStorage.removeItem('agrofinance:membership')
+    } catch {
+      // Logout local ainda deve acontecer quando a API nao responder.
+    }
+
+    clearStoredAuth()
     setState({
       user: null,
       membership: null,
       memberships: [],
+      companyId: null,
       isLoading: false,
       isAuthenticated: false,
     })

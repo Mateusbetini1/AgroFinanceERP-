@@ -34,6 +34,7 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormData) {
     setApiError(null)
+
     try {
       const { data } = await api.post<{ success: boolean; data: LoginResponse }>('/auth/login', values)
       login(data.data)
@@ -51,12 +52,11 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="space-y-1">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-2xl">🌱</span>
+        <div className="mb-2">
           <span className="text-xl font-bold text-primary">AgroFinance</span>
         </div>
-        <CardTitle>Entrar na sua conta</CardTitle>
-        <CardDescription>Digite seu email e senha para acessar o sistema</CardDescription>
+        <CardTitle>Entrar</CardTitle>
+        <CardDescription>Acesse sua empresa no AgroFinance ERP.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -65,7 +65,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="seu@email.com"
+              placeholder="admin@agrofinance.com"
               autoComplete="email"
               {...register('email')}
             />
@@ -77,7 +77,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Sua senha"
               autoComplete="current-password"
               {...register('password')}
             />

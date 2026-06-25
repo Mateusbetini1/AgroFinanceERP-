@@ -1,55 +1,48 @@
 import axios from 'axios'
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+import { API_BASE_URL } from '@/lib/config'
 
 export const api = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Queue de requisições que falharam enquanto o token estava sendo renovado
 let isRefreshing = false
 let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = []
 
 function processQueue(error: unknown, token: string | null) {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)))
+  failedQueue.forEach((item) => (error ? item.reject(error) : item.resolve(token!)))
   failedQueue = []
 }
 
 function clearAuth() {
   if (typeof window === 'undefined') return
+
   localStorage.removeItem('agrofinance:access')
   localStorage.removeItem('agrofinance:refresh')
   localStorage.removeItem('agrofinance:membership')
+  localStorage.removeItem('agrofinance:company-id')
   window.location.href = '/login'
 }
 
-// Injeta token de acesso e company ID em toda requisição
 api.interceptors.request.use((config) => {
   if (typeof window === 'undefined') return config
 
   const token = localStorage.getItem('agrofinance:access')
-  const membershipRaw = localStorage.getItem('agrofinance:membership')
+  const companyId = localStorage.getItem('agrofinance:company-id')
 
   if (token) config.headers.Authorization = `Bearer ${token}`
-  if (membershipRaw) {
-    try {
-      const membership = JSON.parse(membershipRaw)
-      config.headers['x-company-id'] = membership.company.id
-    } catch {}
-  }
+  if (companyId) config.headers['x-company-id'] = companyId
 
   return config
 })
 
-// Intercepta 401: tenta renovar token e reprocessa a fila
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config as typeof error.config & { _retry?: boolean }
-
     const isAuthEndpoint = original?.url?.includes('/auth/')
-    if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
+
+    if (error.response?.status !== 401 || original?._retry || isAuthEndpoint) {
       return Promise.reject(error)
     }
 
@@ -65,14 +58,16 @@ api.interceptors.response.use(
     original._retry = true
     isRefreshing = true
 
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('agrofinance:refresh') : null
+    const refreshToken =
+      typeof window !== 'undefined' ? localStorage.getItem('agrofinance:refresh') : null
+
     if (!refreshToken) {
       clearAuth()
       return Promise.reject(error)
     }
 
     try {
-      const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh`, { refreshToken })
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
       const newAccess: string = data.data.accessToken
       const newRefresh: string = data.data.refreshToken
 

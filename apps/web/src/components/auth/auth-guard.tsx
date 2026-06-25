@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { PageSpinner } from '@/components/ui/spinner'
 import { useAuth } from '@/contexts/auth-context'
 
-export default function RootPage() {
+export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { isLoading, isAuthenticated, companyId } = useAuth()
 
   useEffect(() => {
@@ -17,13 +18,12 @@ export default function RootPage() {
       return
     }
 
-    if (!companyId) {
+    if (!companyId && pathname !== '/company-select') {
       router.replace('/company-select')
-      return
     }
+  }, [companyId, isAuthenticated, isLoading, pathname, router])
 
-    router.replace('/dashboard')
-  }, [companyId, isAuthenticated, isLoading, router])
+  if (isLoading || !isAuthenticated || !companyId) return <PageSpinner />
 
-  return <PageSpinner />
+  return <>{children}</>
 }
