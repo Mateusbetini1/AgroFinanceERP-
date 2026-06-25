@@ -10,6 +10,7 @@ interface ListPageProps {
   isError: boolean
   isEmpty: boolean
   onRetry: () => void
+  onNew?: () => void
   children: React.ReactNode
 }
 
@@ -20,6 +21,7 @@ export function ListPage({
   isError,
   isEmpty,
   onRetry,
+  onNew,
   children,
 }: ListPageProps) {
   return (
@@ -29,7 +31,7 @@ export function ListPage({
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button type="button" disabled>
+        <Button type="button" disabled={!onNew} onClick={onNew}>
           <Plus className="h-4 w-4" />
           Novo
         </Button>

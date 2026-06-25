@@ -57,6 +57,10 @@ export function formatUnit(unit: string | null | undefined): string {
   return labels[unit] ?? unit
 }
 
+export function onlyDigits(value: string | null | undefined): string {
+  return (value ?? '').replace(/\D/g, '')
+}
+
 export function getApiErrorMessage(error: unknown, fallback = 'Erro inesperado. Tente novamente.'): string {
   if (
     error &&

@@ -100,9 +100,10 @@ export interface Category {
   id: string
   name: string
   type: CategoryType
-  color: string
+  color: string | null
   active: boolean
   createdAt: string
+  updatedAt: string
 }
 
 // ── Product ──────────────────────────────────────────────────────────────────

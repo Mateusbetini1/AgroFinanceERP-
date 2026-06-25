@@ -5,55 +5,53 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
-import { createAccount, deleteAccount, listAccounts, updateAccount, type AccountPayload } from '@/features/accounts/api'
-import { AccountForm } from '@/features/accounts/components/account-form'
-import { AccountsTable } from '@/features/accounts/components/accounts-table'
+import { CategoryForm } from '@/features/categories/components/category-form'
+import { CategoriesTable } from '@/features/categories/components/categories-table'
+import { createCategory, deleteCategory, listCategories, updateCategory, type CategoryPayload } from '@/features/categories/api'
 import { getApiErrorMessage } from '@/lib/utils'
-import type { Account } from '@/types/api'
+import type { Category } from '@/types/api'
 
-export default function AccountsPage() {
+export default function CategoriesPage() {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
-  const accounts = query.data?.data ?? []
+  const query = useQuery({ queryKey: ['categories'], queryFn: listCategories })
+  const categories = query.data?.data ?? []
 
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<Account | null>(null)
+  const [editing, setEditing] = useState<Category | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-    await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    await queryClient.invalidateQueries({ queryKey: ['categories'] })
   }
 
   const createMutation = useMutation({
-    mutationFn: createAccount,
+    mutationFn: createCategory,
     onSuccess: async () => {
       await invalidate()
       setDialogOpen(false)
-      setFeedback({ type: 'success', message: 'Conta criada com sucesso.' })
+      setFeedback({ type: 'success', message: 'Categoria criada com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Omit<AccountPayload, 'initialBalance'> }) =>
-      updateAccount(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: CategoryPayload }) => updateCategory(id, payload),
     onSuccess: async () => {
       await invalidate()
       setDialogOpen(false)
       setEditing(null)
-      setFeedback({ type: 'success', message: 'Conta atualizada com sucesso.' })
+      setFeedback({ type: 'success', message: 'Categoria atualizada com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: deleteAccount,
+    mutationFn: deleteCategory,
     onMutate: (id) => setDeletingId(id),
     onSuccess: async () => {
       await invalidate()
-      setFeedback({ type: 'success', message: 'Conta excluída com sucesso.' })
+      setFeedback({ type: 'success', message: 'Categoria excluída com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
     onSettled: () => setDeletingId(null),
@@ -65,21 +63,20 @@ export default function AccountsPage() {
     setDialogOpen(true)
   }
 
-  function openEdit(account: Account) {
-    setEditing(account)
+  function openEdit(category: Category) {
+    setEditing(category)
     setFeedback(null)
     setDialogOpen(true)
   }
 
-  function handleDelete(account: Account) {
-    if (!window.confirm(`Excluir a conta "${account.name}"?`)) return
-    deleteMutation.mutate(account.id)
+  function handleDelete(category: Category) {
+    if (!window.confirm(`Excluir a categoria "${category.name}"?`)) return
+    deleteMutation.mutate(category.id)
   }
 
-  function handleSubmit(payload: AccountPayload) {
+  function handleSubmit(payload: CategoryPayload) {
     if (editing) {
-      const { initialBalance: _initialBalance, ...updatePayload } = payload
-      updateMutation.mutate({ id: editing.id, payload: updatePayload })
+      updateMutation.mutate({ id: editing.id, payload })
     } else {
       createMutation.mutate(payload)
     }
@@ -88,29 +85,29 @@ export default function AccountsPage() {
   return (
     <>
       <ListPage
-        title="Contas"
-        description="Saldos operacionais e contas financeiras cadastradas."
+        title="Categorias"
+        description="Categorias usadas para organizar despesas e relatórios."
         isLoading={query.isLoading}
         isError={query.isError}
-        isEmpty={accounts.length === 0}
+        isEmpty={categories.length === 0}
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
-          <AccountsTable accounts={accounts} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          <CategoriesTable categories={categories} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
         </div>
       </ListPage>
 
       <Dialog
         open={dialogOpen}
-        title={editing ? 'Editar conta' : 'Nova conta'}
-        description="Preencha os dados da conta. O saldo inicial só é definido na criação."
+        title={editing ? 'Editar categoria' : 'Nova categoria'}
+        description="Preencha os dados da categoria."
         onClose={() => setDialogOpen(false)}
       >
         {feedback?.type === 'error' && <InlineAlert>{feedback.message}</InlineAlert>}
         <div className="mt-4">
-          <AccountForm
+          <CategoryForm
             initialValue={editing}
             isSubmitting={createMutation.isPending || updateMutation.isPending}
             onSubmit={handleSubmit}

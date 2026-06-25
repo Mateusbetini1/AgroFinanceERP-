@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CreditCard, FileText, Home, Package, Receipt, Sprout, Truck, Users } from 'lucide-react'
+import { BarChart3, CreditCard, FileText, Home, Package, Receipt, Sprout, Tags, Truck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const enabledItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/accounts', label: 'Contas', icon: CreditCard },
+  { href: '/categories', label: 'Categorias', icon: Tags },
   { href: '/products', label: 'Produtos', icon: Package },
   { href: '/suppliers', label: 'Fornecedores', icon: Truck },
   { href: '/revenues', label: 'Receitas', icon: BarChart3 },
