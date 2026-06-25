@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Turbo / cache / coverage
+.turbo/
+.cache/
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local uploads and temp files
+uploads/
+tmp/
+temp/
+
+# Local Docker data volumes
+docker-data/
+postgres-data/
+redis-data/
+minio-data/
+
+# Local tool state
+.claude/
+.agents/
+
+# Temporary applicator scripts used during assisted development
+apply-*.cjs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma local sqlite files, if ever used locally
+*.db
+*.db-journal

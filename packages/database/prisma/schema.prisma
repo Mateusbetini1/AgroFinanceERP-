@@ -1,0 +1,765 @@
+// ================================================================
+// AgroFinance ERP — Prisma Schema
+// Database: PostgreSQL
+// ORM: Prisma 5
+// ================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================================================
+// ENUMS
+// ================================================================
+
+enum MembershipRole {
+  OWNER      // Dono da empresa — acesso total, não pode ser removido
+  ADMIN      // Administrador — acesso total exceto deletar empresa
+  FINANCIAL  // Gestor financeiro — módulos financeiros completos
+  AGRONOMIST // Agrônomo — módulos agrícolas + visualização financeira
+  VIEWER     // Visualizador — leitura apenas
+
+  @@map("membership_role")
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  ENTERPRISE
+
+  @@map("plan_tier")
+}
+
+enum UnitType {
+  KG
+  BOX
+  UNIT
+  BAG
+  TON
+  LITER
+  METER
+  HECTARE
+
+  @@map("unit_type")
+}
+
+enum AccountType {
+  CASH // Caixa físico
+  BANK // Conta bancária
+
+  @@map("account_type")
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+
+  @@map("transaction_type")
+}
+
+enum TransactionReference {
+  REVENUE
+  EXPENSE
+  BILL
+  EMPLOYEE_PAYMENT
+  TRANSFER
+  ADJUSTMENT
+
+  @@map("transaction_reference")
+}
+
+enum CategoryType {
+  EXPENSE
+  REVENUE
+  BOTH
+
+  @@map("category_type")
+}
+
+enum RevenueStatus {
+  RECEIVED // Recebido
+  PENDING  // A receber
+
+  @@map("revenue_status")
+}
+
+enum ExpenseStatus {
+  PAID    // Pago
+  PENDING // Pendente
+  OVERDUE // Vencido — atualizado por cron job diário
+
+  @@map("expense_status")
+}
+
+enum BillStatus {
+  PAID    // Pago
+  PENDING // Pendente
+  OVERDUE // Vencido — atualizado por cron job diário
+
+  @@map("bill_status")
+}
+
+enum EmployeeType {
+  MONTHLY // Mensalista
+  DAILY   // Diarista
+
+  @@map("employee_type")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("employee_status")
+}
+
+enum PaymentType {
+  SALARY     // Salário mensal
+  OVERTIME   // Hora extra
+  ADVANCE    // Vale / adiantamento
+  BONUS      // Bônus
+  DAILY_WAGE // Diária (para diaristas)
+
+  @@map("payment_type")
+}
+
+enum SafraStatus {
+  PLANNED   // Planejada
+  ACTIVE    // Em andamento
+  COMPLETED // Concluída
+  CANCELLED // Cancelada
+
+  @@map("safra_status")
+}
+
+enum FarmLocationType {
+  GREENHOUSE // Estufa
+  PLOT       // Talhão
+  FIELD      // Campo aberto
+
+  @@map("farm_location_type")
+}
+
+enum FileType {
+  PDF
+  XML
+  IMAGE
+
+  @@map("file_type")
+}
+
+enum OcrStatus {
+  NONE       // Sem OCR
+  PENDING    // Na fila
+  PROCESSING // Processando
+  COMPLETED  // Concluído
+  FAILED     // Falhou
+
+  @@map("ocr_status")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+
+  @@map("audit_action")
+}
+
+// ================================================================
+// COMPANY + AUTH
+// ================================================================
+
+// Company é o tenant raiz. Toda entidade de negócio pertence a uma Company.
+// Um usuário pode ser membro de múltiplas companies via Membership.
+model Company {
+  id        String    @id @default(uuid())
+  name      String
+  document  String?   @unique // CNPJ (14 dígitos sem máscara)
+  email     String?
+  phone     String?
+  logoUrl   String?   @map("logo_url")
+  planTier  PlanTier  @default(FREE) @map("plan_tier")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  memberships      Membership[]
+  products         Product[]
+  categories       Category[]
+  suppliers        Supplier[]
+  accounts         Account[]
+  transactions     Transaction[]
+  transfers        Transfer[]
+  revenues         Revenue[]
+  revenueGroups    RevenueGroup[]
+  expenses         Expense[]
+  employees        Employee[]
+  employeePayments EmployeePayment[]
+  bills            Bill[]
+  billGroups       BillGroup[]
+  invoices         Invoice[]
+  farmLocations    FarmLocation[]
+  safras           Safra[]
+
+  @@index([active])
+  @@map("companies")
+}
+
+// User existe independente de Company.
+// A relação com Company é feita via Membership.
+// Um User pode pertencer a 0 ou N Companies.
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+  memberships   Membership[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// Membership é a tabela de junção entre User e Company.
+// Define o papel do usuário dentro de uma empresa específica.
+model Membership {
+  id          String         @id @default(uuid())
+  companyId   String         @map("company_id")
+  userId      String         @map("user_id")
+  role        MembershipRole @default(VIEWER)
+  active      Boolean        @default(true)
+  // Campo reservado para RBAC granular na V2
+  // Ex: { "expenses": { "create": true, "delete": false } }
+  permissions Json?
+  invitedAt   DateTime?      @map("invited_at")
+  joinedAt    DateTime?      @map("joined_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("memberships")
+}
+
+// Refresh tokens armazenados como hash (SHA-256).
+// O token real é enviado apenas uma vez ao cliente — nunca armazenado em texto plano.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ================================================================
+// PRODUCT
+// ================================================================
+
+model Product {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  categoryId  String?   @map("category_id")
+  name        String
+  description String?
+  unit        UnitType  @default(KG)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+  revenues Revenue[]
+  safras   Safra[]
+
+  // Partial unique index manual em migration:
+  // CREATE UNIQUE INDEX products_company_id_name_active_unique ON products (company_id, name) WHERE deleted_at IS NULL;
+  @@index([companyId])
+  @@index([companyId, active])
+  @@index([companyId, categoryId])
+  @@map("products")
+}
+
+// ================================================================
+// CATEGORY
+// ================================================================
+
+model Category {
+  id        String       @id @default(uuid())
+  companyId String       @map("company_id")
+  name      String
+  type      CategoryType @default(EXPENSE)
+  color     String?      // hex: "#FF5733" — usado nos gráficos
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  expenses  Expense[]
+  products  Product[]
+
+  // Partial unique index manual em migration:
+  // CREATE UNIQUE INDEX categories_company_id_name_active_unique ON categories (company_id, name) WHERE deleted_at IS NULL;
+  @@index([companyId])
+  @@index([companyId, type])
+  @@map("categories")
+}
+
+// ================================================================
+// SUPPLIER
+// ================================================================
+
+model Supplier {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  name        String
+  document    String    // CPF (11 digitos) ou CNPJ (14 digitos), sem mascara
+  email       String?
+  phone       String?
+  contactName String?   @map("contact_name")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  company    Company     @relation(fields: [companyId], references: [id])
+  expenses   Expense[]
+  bills      Bill[]
+  billGroups BillGroup[]
+
+  // Partial unique index manual em migration:
+  // CREATE UNIQUE INDEX suppliers_company_id_document_active_unique ON suppliers (company_id, document) WHERE deleted_at IS NULL;
+  @@index([companyId, name])
+  @@map("suppliers")
+}
+// ================================================================
+// ACCOUNT (Contas financeiras: Caixa, Banco do Brasil, Sicredi)
+// ================================================================
+
+model Account {
+  id             String      @id @default(uuid())
+  companyId      String      @map("company_id")
+  name           String
+  type           AccountType
+  bankName       String?     @map("bank_name")
+  agency         String?
+  accountNumber  String?     @map("account_number")
+  // initialBalance define o saldo de abertura. currentBalance é cache.
+  // Fonte de verdade real: SELECT SUM em Transaction WHERE accountId = id.
+  initialBalance Decimal     @default(0) @db.Decimal(15, 2) @map("initial_balance")
+  currentBalance Decimal     @default(0) @db.Decimal(15, 2) @map("current_balance")
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  company          Company           @relation(fields: [companyId], references: [id])
+  transactions     Transaction[]
+  revenues         Revenue[]
+  expenses         Expense[]
+  bills            Bill[]
+  employeePayments EmployeePayment[]
+  transfersFrom    Transfer[]        @relation("TransferFrom")
+  transfersTo      Transfer[]        @relation("TransferTo")
+
+  @@index([companyId])
+  @@index([companyId, active])
+  @@map("accounts")
+}
+
+// Ledger imutável. NUNCA deletar ou atualizar registros desta tabela.
+// Para correções: crie uma Transaction de ajuste (referenceType = ADJUSTMENT).
+// balanceAfter é um snapshot do saldo da conta imediatamente após esta transação.
+model Transaction {
+  id            String               @id @default(uuid())
+  companyId     String               @map("company_id")
+  accountId     String               @map("account_id")
+  type          TransactionType
+  amount        Decimal              @db.Decimal(15, 2)
+  balanceAfter  Decimal              @db.Decimal(15, 2) @map("balance_after")
+  description   String
+  referenceType TransactionReference @map("reference_type")
+  referenceId   String?              @map("reference_id")
+  date          DateTime
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([companyId, date])
+  @@index([referenceType, referenceId])
+  @@map("transactions")
+}
+
+// Transfer é modelada explicitamente para clareza e auditoria.
+// Cada Transfer gera exatamente 2 Transactions: 1 DEBIT + 1 CREDIT.
+model Transfer {
+  id            String    @id @default(uuid())
+  companyId     String    @map("company_id")
+  fromAccountId String    @map("from_account_id")
+  toAccountId   String    @map("to_account_id")
+  amount        Decimal   @db.Decimal(15, 2)
+  description   String?
+  date          DateTime
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  company     Company @relation(fields: [companyId], references: [id])
+  fromAccount Account @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccount   Account @relation("TransferTo", fields: [toAccountId], references: [id])
+
+  @@index([companyId, date])
+  @@map("transfers")
+}
+// ================================================================
+// FARM (Estufa / Talhão / Campo)
+// ================================================================
+
+// FarmLocation é um local físico permanente e reutilizável.
+// Registrar uma vez, referenciar em múltiplas Safras.
+model FarmLocation {
+  id        String           @id @default(uuid())
+  companyId String           @map("company_id")
+  name      String           // "Estufa A", "Talhão 3", "Campo Norte"
+  type      FarmLocationType
+  area      Decimal?         @db.Decimal(10, 2) // em m²
+  notes     String?
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  safras  Safra[]
+
+  @@index([companyId])
+  @@index([companyId, active])
+  @@map("farm_locations")
+}
+
+// Safra representa um ciclo de plantio completo.
+// Vincula produto + local físico + período temporal.
+// Receitas e despesas com safraId permitem P&L por safra.
+model Safra {
+  id             String      @id @default(uuid())
+  companyId      String      @map("company_id")
+  farmLocationId String?     @map("farm_location_id")
+  productId      String      @map("product_id")
+  name           String      // "Safra Pepino — Estufa A — Jan/2026"
+  startDate      DateTime    @map("start_date")
+  endDate        DateTime?   @map("end_date")
+  estimatedYield Decimal?    @db.Decimal(15, 3) @map("estimated_yield") // kg estimado
+  status         SafraStatus @default(PLANNED)
+  notes          String?
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  farmLocation FarmLocation? @relation(fields: [farmLocationId], references: [id])
+  product      Product       @relation(fields: [productId], references: [id])
+  revenues     Revenue[]
+  expenses     Expense[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, startDate])
+  @@map("safras")
+}
+
+// ================================================================
+// REVENUE (Receitas)
+// ================================================================
+
+// Agrupa parcelas de uma venda parcelada.
+// Para venda à vista: Revenue sem revenueGroupId.
+model RevenueGroup {
+  id               String   @id @default(uuid())
+  companyId        String   @map("company_id")
+  productId        String?  @map("product_id")
+  client           String?
+  totalAmount      Decimal  @db.Decimal(15, 2) @map("total_amount")
+  installmentCount Int      @map("installment_count")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  revenues Revenue[]
+
+  @@index([companyId])
+  @@map("revenue_groups")
+}
+
+model Revenue {
+  id                String        @id @default(uuid())
+  companyId         String        @map("company_id")
+  revenueGroupId    String?       @map("revenue_group_id")
+  productId         String        @map("product_id")
+  accountId         String?       @map("account_id")
+  safraId           String?       @map("safra_id")
+  date              DateTime      // data da venda ou vencimento da parcela
+  receivedAt        DateTime?     @map("received_at") // data real do recebimento
+  quantity          Decimal       @db.Decimal(15, 3)
+  unitPrice         Decimal       @db.Decimal(15, 2) @map("unit_price")
+  totalAmount       Decimal       @db.Decimal(15, 2) @map("total_amount")
+  client            String?
+  notes             String?
+  status            RevenueStatus @default(PENDING)
+  installmentNumber Int?          @map("installment_number")
+  installmentCount  Int?          @map("installment_count")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  deletedAt         DateTime?     @map("deleted_at")
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  revenueGroup RevenueGroup? @relation(fields: [revenueGroupId], references: [id])
+  product      Product       @relation(fields: [productId], references: [id])
+  account      Account?      @relation(fields: [accountId], references: [id])
+  safra        Safra?        @relation(fields: [safraId], references: [id])
+  invoices     Invoice[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, date])
+  @@index([companyId, safraId])
+  @@index([revenueGroupId])
+  @@map("revenues")
+}
+
+// ================================================================
+// EXPENSE (Despesas)
+// ================================================================
+
+model Expense {
+  id            String        @id @default(uuid())
+  companyId     String        @map("company_id")
+  categoryId    String        @map("category_id")
+  supplierId    String?       @map("supplier_id")
+  accountId     String?       @map("account_id")
+  safraId       String?       @map("safra_id")
+  date          DateTime      // data do lançamento
+  dueDate       DateTime?     @map("due_date") // data de vencimento (quando diferente de date)
+  paidAt        DateTime?     @map("paid_at")
+  amount        Decimal       @db.Decimal(15, 2)
+  description   String
+  status        ExpenseStatus @default(PENDING)
+  attachmentUrl String?       @map("attachment_url")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  deletedAt     DateTime?     @map("deleted_at")
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  category Category  @relation(fields: [categoryId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  account  Account?  @relation(fields: [accountId], references: [id])
+  safra    Safra?    @relation(fields: [safraId], references: [id])
+  invoices Invoice[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, date])
+  @@index([companyId, categoryId])
+  @@index([companyId, supplierId])
+  @@index([companyId, safraId])
+  @@index([companyId, dueDate]) // cron de OVERDUE
+  @@map("expenses")
+}
+
+// ================================================================
+// EMPLOYEE (Funcionários)
+// ================================================================
+
+model Employee {
+  id         String         @id @default(uuid())
+  companyId  String         @map("company_id")
+  name       String
+  role       String         // cargo livre: "Operador de Estufa", "Motorista"
+  document   String?        // CPF (11 dígitos sem máscara)
+  phone      String?
+  pixKey     String?        @map("pix_key")
+  baseSalary Decimal        @db.Decimal(15, 2) @map("base_salary")
+  type       EmployeeType
+  status     EmployeeStatus @default(ACTIVE)
+  hireDate   DateTime       @map("hire_date")
+  notes      String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  deletedAt  DateTime?      @map("deleted_at")
+
+  company  Company           @relation(fields: [companyId], references: [id])
+  payments EmployeePayment[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@map("employees")
+}
+
+// Cada linha é um lançamento de pagamento.
+// O vínculo com Transaction (via referenceType = EMPLOYEE_PAYMENT) garante
+// que o pagamento reflita no extrato da conta corretamente.
+model EmployeePayment {
+  id             String      @id @default(uuid())
+  companyId      String      @map("company_id")
+  employeeId     String      @map("employee_id")
+  accountId      String?     @map("account_id")
+  type           PaymentType
+  amount         Decimal     @db.Decimal(15, 2)
+  date           DateTime
+  referenceMonth Int         @map("reference_month") // 1–12 (competência)
+  referenceYear  Int         @map("reference_year")
+  notes          String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+  account  Account? @relation(fields: [accountId], references: [id])
+
+  @@index([employeeId])
+  @@index([companyId, referenceYear, referenceMonth])
+  @@map("employee_payments")
+}
+
+// ================================================================
+// BILL (Boletos)
+// ================================================================
+
+// Agrupa parcelas de um boleto parcelado.
+model BillGroup {
+  id               String    @id @default(uuid())
+  companyId        String    @map("company_id")
+  supplierId       String?   @map("supplier_id")
+  description      String
+  totalAmount      Decimal   @db.Decimal(15, 2) @map("total_amount")
+  installmentCount Int       @map("installment_count")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  bills    Bill[]
+
+  @@index([companyId])
+  @@map("bill_groups")
+}
+
+model Bill {
+  id                String     @id @default(uuid())
+  companyId         String     @map("company_id")
+  billGroupId       String?    @map("bill_group_id")
+  supplierId        String?    @map("supplier_id")
+  accountId         String?    @map("account_id")
+  description       String
+  amount            Decimal    @db.Decimal(15, 2)
+  dueDate           DateTime   @map("due_date")
+  paidAt            DateTime?  @map("paid_at")
+  status            BillStatus @default(PENDING)
+  fileUrl           String?    @map("file_url")
+  installmentNumber Int?       @map("installment_number")
+  installmentCount  Int?       @map("installment_count")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  billGroup BillGroup? @relation(fields: [billGroupId], references: [id])
+  supplier  Supplier?  @relation(fields: [supplierId], references: [id])
+  account   Account?   @relation(fields: [accountId], references: [id])
+  invoices  Invoice[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, dueDate])
+  @@index([companyId, status, dueDate]) // query: boletos pendentes vencendo em N dias
+  @@index([billGroupId])
+  @@map("bills")
+}
+
+// ================================================================
+// INVOICE (Notas Fiscais e documentos)
+// ================================================================
+
+// Invoice pode ser vinculada a Revenue, Expense ou Bill.
+// ocrData é Json livre para armazenar o que o Google Cloud Vision retornar na V2.
+model Invoice {
+  id        String    @id @default(uuid())
+  companyId String    @map("company_id")
+  number    String?   // número da NF
+  amount    Decimal?  @db.Decimal(15, 2)
+  issuedAt  DateTime? @map("issued_at")
+  fileUrl   String    @map("file_url")
+  fileType  FileType  @map("file_type")
+  revenueId String?   @map("revenue_id")
+  expenseId String?   @map("expense_id")
+  billId    String?   @map("bill_id")
+  ocrStatus OcrStatus @default(NONE) @map("ocr_status")
+  ocrData   Json?     @map("ocr_data")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  company Company  @relation(fields: [companyId], references: [id])
+  revenue Revenue? @relation(fields: [revenueId], references: [id])
+  expense Expense? @relation(fields: [expenseId], references: [id])
+  bill    Bill?    @relation(fields: [billId], references: [id])
+
+  @@index([companyId])
+  @@index([revenueId])
+  @@index([expenseId])
+  @@index([billId])
+  @@map("invoices")
+}
+
+// ================================================================
+// AUDIT LOG
+// ================================================================
+
+// Registro imutável de todas as operações de escrita.
+// before/after armazenam snapshots JSON das entidades.
+// Nunca deletar registros desta tabela.
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String      @map("user_id")
+  companyId  String?     @map("company_id")
+  action     AuditAction
+  entityType String      @map("entity_type") // "Revenue", "Expense", "Bill"
+  entityId   String      @map("entity_id")
+  before     Json?
+  after      Json?
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

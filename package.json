@@ -1,0 +1,28 @@
+{
+  "name": "agrofinance-erp",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:generate": "pnpm --filter @agrofinance/database generate",
+    "db:migrate": "pnpm --filter @agrofinance/database migrate",
+    "db:migrate:prod": "pnpm --filter @agrofinance/database migrate:prod",
+    "db:studio": "pnpm --filter @agrofinance/database studio",
+    "db:seed": "pnpm --filter @agrofinance/database seed",
+    "db:reset": "pnpm --filter @agrofinance/database reset",
+    "api:smoke": "pnpm --filter api smoke"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  }
+}
