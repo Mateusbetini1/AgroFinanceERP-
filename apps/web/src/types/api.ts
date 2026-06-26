@@ -216,12 +216,13 @@ export interface Employee {
   document: string | null
   phone: string | null
   pixKey: string | null
-  baseSalary: number
+  baseSalary: number | string
   type: EmployeeType
   status: EmployeeStatus
   hireDate: string
   notes: string | null
   createdAt: string
+  updatedAt?: string
 }
 
 // ── Transfer ─────────────────────────────────────────────────────────────────
@@ -280,13 +281,16 @@ export type PaymentType = 'SALARY' | 'OVERTIME' | 'ADVANCE' | 'BONUS' | 'DAILY_W
 
 export interface EmployeePayment {
   id: string
-  employee: { name: string }
-  account: { name: string } | null
+  employeeId: string
+  employee: { id?: string; name: string; role?: string; status?: EmployeeStatus }
+  accountId: string | null
+  account: { id?: string; name: string; type?: AccountType } | null
   type: PaymentType
-  amount: number
+  amount: number | string
   date: string
   referenceMonth: number
   referenceYear: number
   notes: string | null
   createdAt: string
+  updatedAt: string
 }

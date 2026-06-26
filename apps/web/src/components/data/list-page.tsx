@@ -62,9 +62,7 @@ export function ListPage({
 
       {!isLoading && !isError && isEmpty && (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Nenhum registro encontrado.
-          </CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground">Nenhum registro encontrado.</CardContent>
         </Card>
       )}
 

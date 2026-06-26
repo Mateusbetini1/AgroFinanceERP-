@@ -2,7 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeftRight, BarChart3, CreditCard, FileText, Home, Package, Receipt, Sprout, Tags, Truck, Users } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  BarChart3,
+  CreditCard,
+  FileText,
+  HandCoins,
+  Home,
+  Package,
+  Receipt,
+  Sprout,
+  Tags,
+  Truck,
+  Users,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const enabledItems = [
@@ -15,6 +28,7 @@ const enabledItems = [
   { href: '/expenses', label: 'Despesas', icon: Receipt },
   { href: '/bills', label: 'Boletos', icon: FileText },
   { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
+  { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
 ]
 
 const upcomingItems = [

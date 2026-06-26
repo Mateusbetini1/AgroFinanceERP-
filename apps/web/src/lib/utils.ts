@@ -80,6 +80,20 @@ export function formatUnit(unit: string | null | undefined): string {
   return labels[unit] ?? unit
 }
 
+export function formatPaymentType(type: string | null | undefined): string {
+  if (!type) return '-'
+
+  const labels: Record<string, string> = {
+    SALARY: 'Salário',
+    OVERTIME: 'Hora extra',
+    ADVANCE: 'Adiantamento',
+    BONUS: 'Bônus',
+    DAILY_WAGE: 'Diária',
+  }
+
+  return labels[type] ?? type
+}
+
 export function onlyDigits(value: string | null | undefined): string {
   return (value ?? '').replace(/\D/g, '')
 }
