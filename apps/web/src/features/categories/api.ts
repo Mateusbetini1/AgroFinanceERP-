@@ -8,18 +8,37 @@ export interface CategoryPayload {
   active?: boolean
 }
 
+function cleanCreateCategoryPayload(payload: CategoryPayload): CategoryPayload {
+  const clean: CategoryPayload = { name: payload.name }
+
+  if (payload.type) clean.type = payload.type
+  if (payload.color) clean.color = payload.color
+
+  return clean
+}
+
+function cleanUpdateCategoryPayload(payload: CategoryPayload): CategoryPayload {
+  const clean: CategoryPayload = { name: payload.name }
+
+  if (payload.type) clean.type = payload.type
+  if (payload.color !== undefined) clean.color = payload.color
+  if (payload.active !== undefined) clean.active = payload.active
+
+  return clean
+}
+
 export async function listCategories() {
   const { data } = await api.get<PaginatedResponse<Category>>('/categories')
   return data
 }
 
 export async function createCategory(payload: CategoryPayload) {
-  const { data } = await api.post<ApiResponse<Category>>('/categories', payload)
+  const { data } = await api.post<ApiResponse<Category>>('/categories', cleanCreateCategoryPayload(payload))
   return data.data
 }
 
 export async function updateCategory(id: string, payload: CategoryPayload) {
-  const { data } = await api.patch<ApiResponse<Category>>(`/categories/${id}`, payload)
+  const { data } = await api.patch<ApiResponse<Category>>(`/categories/${id}`, cleanUpdateCategoryPayload(payload))
   return data.data
 }
 

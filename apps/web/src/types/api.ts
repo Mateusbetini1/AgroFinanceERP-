@@ -140,10 +140,13 @@ export type RevenueStatus = 'PENDING' | 'RECEIVED'
 
 export interface Revenue {
   id: string
+  productId: string
+  accountId: string | null
+  safraId: string | null
   date: string
   receivedAt: string | null
-  product: { name: string }
-  account: { name: string } | null
+  product: { id?: string; name: string }
+  account: { id?: string; name: string; type?: AccountType } | null
   client: string | null
   quantity: number | string
   unitPrice: number | string
@@ -233,15 +236,18 @@ export type SafraStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
 export interface Safra {
   id: string
   name: string
-  product: { name: string }
-  farmLocation: { name: string } | null
+  productId?: string
+  product: { id?: string; name: string; active?: boolean }
+  farmLocationId?: string | null
+  farmLocation: { id?: string; name: string; type?: FarmLocationType; active?: boolean } | null
   startDate: string
   endDate: string | null
-  estimatedYield: number | null
+  estimatedYield: number | string | null
   status: SafraStatus
   notes: string | null
   active: boolean
   createdAt: string
+  updatedAt?: string
 }
 
 // ── FarmLocation ─────────────────────────────────────────────────────────────

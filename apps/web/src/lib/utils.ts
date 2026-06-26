@@ -12,7 +12,30 @@ export function formatCurrency(value: number | string | null | undefined): strin
 
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '-'
+  if (typeof date === 'string') {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      const [, year, month, day] = match
+      return new Intl.DateTimeFormat('pt-BR').format(
+        new Date(Number(year), Number(month) - 1, Number(day)),
+      )
+    }
+  }
   return new Intl.DateTimeFormat('pt-BR').format(new Date(date))
+}
+
+export function toDateInputValue(date: string | Date | null | undefined): string {
+  if (!date) return ''
+  if (typeof date === 'string') return date.slice(0, 10)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function dateInputToIso(value: string | null | undefined): string | null {
+  if (!value) return null
+  return `${value}T12:00:00.000Z`
 }
 
 export function formatDecimal(value: number | string | null | undefined, decimals = 2): string {
@@ -73,7 +96,14 @@ export function getApiErrorMessage(error: unknown, fallback = 'Erro inesperado. 
     typeof error.response.data === 'object' &&
     'message' in error.response.data
   ) {
-    return String((error.response.data as { message: string }).message)
+    const data = error.response.data as { message: string; errors?: Record<string, string[]> }
+    if (data.errors && Object.keys(data.errors).length > 0) {
+      const details = Object.entries(data.errors)
+        .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+        .join(' | ')
+      return `${data.message}: ${details}`
+    }
+    return String(data.message)
   }
   return fallback
 }

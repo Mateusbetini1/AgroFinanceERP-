@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -7,17 +8,24 @@ const DEMO_EMAIL = 'admin@agrofinance.com'
 const DEMO_PASSWORD = 'Admin@123456'
 const DEMO_COMPANY_DOCUMENT = '00000000000000'
 
-function slug(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
 function seedId(companyId: string, type: string, key: string): string {
-  return 'seed-' + type + '-' + companyId + '-' + slug(key)
+  const hash = createHash('sha256')
+    .update(['agrofinance-demo-seed', companyId, type, key].join(':'))
+    .digest('hex')
+    .slice(0, 32)
+    .split('')
+
+  hash[12] = '5'
+  hash[16] = ((Number.parseInt(hash[16], 16) & 0x3) | 0x8).toString(16)
+
+  const value = hash.join('')
+  return [
+    value.slice(0, 8),
+    value.slice(8, 12),
+    value.slice(12, 16),
+    value.slice(16, 20),
+    value.slice(20),
+  ].join('-')
 }
 
 function atNoon(date: Date): Date {
