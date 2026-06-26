@@ -104,7 +104,7 @@ export default function DashboardPage() {
             tone="positive"
           />
           <KpiCard
-            title="Despesas pagas"
+            title="Saídas pagas"
             value={formatCurrency(query.data.expenseTotal)}
             icon={ArrowDownCircle}
             tone="negative"
@@ -121,7 +121,7 @@ export default function DashboardPage() {
             icon={ArrowUpCircle}
           />
           <KpiCard
-            title="Pagáveis pendentes"
+            title="Despesas e boletos pendentes"
             value={formatCurrency(query.data.pendingPayables)}
             icon={ArrowDownCircle}
             tone="warning"
@@ -134,7 +134,7 @@ export default function DashboardPage() {
           />
           <KpiCard title="Safras ativas" value={String(query.data.activeSafras)} icon={Sprout} />
           <KpiCard
-            title="Boletos próximos"
+            title="Boletos a vencer em 7 dias"
             value={`${query.data.billsDueSoon.count} / ${formatCurrency(query.data.billsDueSoon.total)}`}
             icon={CalendarClock}
             tone="warning"

@@ -29,6 +29,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT_STANDALONE=true
 
 # Compilar shared antes do Next.js (web depende de @agrofinance/shared)
 RUN pnpm --filter @agrofinance/shared build

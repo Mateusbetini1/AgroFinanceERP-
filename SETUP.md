@@ -92,6 +92,39 @@ pnpm --filter api test
 pnpm --filter api build
 ```
 
+## 5.1. Subir o frontend web
+
+Em outro PowerShell, com a API rodando:
+
+```powershell
+cd D:\projetofinancas
+$env:NEXT_PUBLIC_API_URL="http://localhost:3001/api/v1"
+pnpm --filter web dev
+```
+
+Acesse:
+
+```text
+http://localhost:3000
+```
+
+Login demo criado pelo seed:
+
+```text
+Email: admin@agrofinance.com
+Senha: Admin@123456
+```
+
+O seed atual usa UUIDs validos em todos os registros demo, evitando erro 422 ao editar/excluir dados criados pelo seed.
+
+Build local do web:
+
+```powershell
+pnpm --filter web build
+```
+
+No Windows, o build local nao habilita `output: 'standalone'` por padrao para evitar erro `EPERM` ao criar symlinks. O build Docker de producao continua habilitando standalone automaticamente com `NEXT_OUTPUT_STANDALONE=true`.
+
 ## 6. Rodar smoke test real
 
 Com a API rodando:

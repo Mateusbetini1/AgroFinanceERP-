@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
+const useStandaloneOutput = process.env.NEXT_OUTPUT_STANDALONE === 'true'
+
 const nextConfig = {
-  output: 'standalone',
+  ...(useStandaloneOutput ? { output: 'standalone' } : {}),
   transpilePackages: ['@agrofinance/shared'],
   images: {
     remotePatterns: [

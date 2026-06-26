@@ -39,7 +39,7 @@ function cleanUpdateRevenuePayload(payload: RevenuePayload): RevenuePayload {
     if (value === undefined || value === '') continue
 
     if (value === null) {
-      if (key === 'accountId' || key === 'safraId') {
+      if (key === 'accountId' || key === 'safraId' || key === 'receivedAt' || key === 'client' || key === 'notes') {
         clean[key] = value
       }
       continue

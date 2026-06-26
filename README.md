@@ -74,6 +74,24 @@ Run API smoke test after the API is running:
 pnpm --filter api smoke
 ```
 
+Run the web app locally:
+
+```powershell
+$env:NEXT_PUBLIC_API_URL="http://localhost:3001/api/v1"
+pnpm --filter web dev
+```
+
+Demo login after running the seed:
+
+```text
+Email: admin@agrofinance.com
+Password: Admin@123456
+```
+
+The demo seed uses valid UUIDs for all records and relationships, so records created by the seed can be edited from the web app.
+
+On Windows, local `pnpm --filter web build` does not enable Next.js `output: 'standalone'` by default to avoid `EPERM` symlink errors. Docker production builds still enable standalone output through `NEXT_OUTPUT_STANDALONE=true`.
+
 ## Environment Files
 
 Do not commit real `.env` files.
