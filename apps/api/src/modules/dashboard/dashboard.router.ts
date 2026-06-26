@@ -8,9 +8,11 @@ import { asyncHandler } from '../../shared/utils/async-handler'
 import {
   dashboardQuerySchema,
   cashflowQuerySchema,
+  monthlyDashboardQuerySchema,
   payablesQuerySchema,
   type DashboardQuery,
   type CashflowQuery,
+  type MonthlyDashboardQuery,
   type PayablesQuery,
 } from './dashboard.schemas'
 
@@ -18,6 +20,18 @@ export const dashboardRouter = Router()
 
 dashboardRouter.use(authenticate)
 dashboardRouter.use(requireCompany)
+
+// GET /api/v1/dashboard/monthly
+dashboardRouter.get(
+  '/monthly',
+  anyMember,
+  validate(monthlyDashboardQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const query = req.query as unknown as MonthlyDashboardQuery
+    const data = await DashboardService.monthly(req.company!.id, query.month, query.year)
+    res.json({ success: true, data })
+  }),
+)
 
 // GET /api/v1/dashboard/summary
 dashboardRouter.get(

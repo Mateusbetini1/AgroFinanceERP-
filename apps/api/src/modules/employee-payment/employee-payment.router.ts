@@ -9,14 +9,29 @@ import {
   createEmployeePaymentSchema,
   updateEmployeePaymentSchema,
   listEmployeePaymentsSchema,
+  payrollSummaryQuerySchema,
   employeePaymentParamsSchema,
   type ListEmployeePaymentsQuery,
+  type PayrollSummaryQuery,
 } from './employee-payment.schemas'
+import { getPayrollSummary } from './payroll-summary.service'
 
 export const employeePaymentRouter = Router()
 
 employeePaymentRouter.use(authenticate)
 employeePaymentRouter.use(requireCompany)
+
+// GET /api/v1/employee-payments/payroll-summary
+employeePaymentRouter.get(
+  '/payroll-summary',
+  anyMember,
+  validate(payrollSummaryQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const query = req.query as unknown as PayrollSummaryQuery
+    const data = await getPayrollSummary(req.company!.id, query.month, query.year)
+    res.json({ success: true, data })
+  }),
+)
 
 // GET /api/v1/employee-payments
 employeePaymentRouter.get(

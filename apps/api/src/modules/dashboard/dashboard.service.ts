@@ -1,5 +1,7 @@
 import { prisma } from '../../config/prisma'
 import type { DashboardQuery, CashflowQuery, PayablesQuery } from './dashboard.schemas'
+import { getPayrollSummary } from '../employee-payment/payroll-summary.service'
+import { getMonthPeriod } from '../../shared/utils/month-period'
 
 type MonthBucket = {
   year: number
@@ -202,6 +204,115 @@ function initializeBuckets(startDate: Date, endDate: Date): Map<string, MonthBuc
 export const DashboardService = {
   async summary(companyId: string) {
     return DashboardService.overview(companyId, {})
+  },
+
+  async monthly(companyId: string, month: number, year: number) {
+    const period = getMonthPeriod(month, year)
+    const bounds = period.bounds
+
+    const [
+      realizedRevenue,
+      pendingRevenue,
+      paidExpenses,
+      pendingExpenses,
+      paidBills,
+      pendingBills,
+      employeePaymentsPaid,
+      payroll,
+    ] = await Promise.all([
+      prisma.revenue.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'RECEIVED',
+          OR: [{ receivedAt: bounds }, { receivedAt: null, date: bounds }],
+        },
+        _sum: { totalAmount: true },
+      }),
+      prisma.revenue.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PENDING',
+          OR: [{ receivedAt: bounds }, { receivedAt: null, date: bounds }],
+        },
+        _sum: { totalAmount: true },
+      }),
+      prisma.expense.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PAID',
+          OR: [{ paidAt: bounds }, { paidAt: null, date: bounds }],
+        },
+        _sum: { amount: true },
+      }),
+      prisma.expense.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          OR: [{ dueDate: bounds }, { dueDate: null, date: bounds }],
+        },
+        _sum: { amount: true },
+      }),
+      prisma.bill.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PAID',
+          OR: [{ paidAt: bounds }, { paidAt: null, dueDate: bounds }],
+        },
+        _sum: { amount: true },
+      }),
+      prisma.bill.aggregate({
+        where: { companyId, deletedAt: null, status: { in: ['PENDING', 'OVERDUE'] }, dueDate: bounds },
+        _sum: { amount: true },
+      }),
+      prisma.employeePayment.aggregate({
+        where: { companyId, deletedAt: null, date: bounds },
+        _sum: { amount: true },
+      }),
+      getPayrollSummary(companyId, month, year),
+    ])
+
+    const realizedRevenueTotal = toNumber(realizedRevenue._sum.totalAmount)
+    const pendingRevenueTotal = toNumber(pendingRevenue._sum.totalAmount)
+    const paidExpensesTotal = toNumber(paidExpenses._sum.amount)
+    const pendingExpensesTotal = toNumber(pendingExpenses._sum.amount)
+    const paidBillsTotal = toNumber(paidBills._sum.amount)
+    const pendingBillsTotal = toNumber(pendingBills._sum.amount)
+    const employeePaymentsPaidTotal = toNumber(employeePaymentsPaid._sum.amount)
+    const realizedOutflows = paidExpensesTotal + paidBillsTotal + employeePaymentsPaidTotal
+    const realizedResult = realizedRevenueTotal - realizedOutflows
+    const projectedInflows = realizedRevenueTotal + pendingRevenueTotal
+    const projectedOutflows =
+      paidExpensesTotal +
+      paidBillsTotal +
+      employeePaymentsPaidTotal +
+      pendingExpensesTotal +
+      pendingBillsTotal +
+      payroll.payrollRemaining
+
+    return {
+      month,
+      year,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      realizedRevenue: realizedRevenueTotal,
+      pendingRevenue: pendingRevenueTotal,
+      paidExpenses: paidExpensesTotal,
+      pendingExpenses: pendingExpensesTotal,
+      paidBills: paidBillsTotal,
+      pendingBills: pendingBillsTotal,
+      employeePaymentsPaid: employeePaymentsPaidTotal,
+      realizedOutflows,
+      realizedResult,
+      projectedInflows,
+      projectedOutflows,
+      projectedResult: projectedInflows - projectedOutflows,
+      payroll,
+    }
   },
 
   async overview(companyId: string, query: DashboardQuery) {

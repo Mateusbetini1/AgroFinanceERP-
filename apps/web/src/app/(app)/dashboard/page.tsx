@@ -1,15 +1,41 @@
 'use client'
 
-import { AlertCircle, ArrowDownCircle, ArrowUpCircle, CalendarClock, Landmark, RefreshCcw, Sprout, Wallet } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CalendarClock,
+  Landmark,
+  RefreshCcw,
+  UserRound,
+  WalletCards,
+} from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import type { ComponentType } from 'react'
+import { useState, type ComponentType } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Spinner } from '@/components/ui/spinner'
-import { getDashboardOverview } from '@/features/dashboard/api'
-import { formatCurrency } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { getDashboardMonthly } from '@/features/dashboard/api'
+import { formatCurrency, formatEmployeeType } from '@/lib/utils'
 
 type KpiTone = 'default' | 'positive' | 'negative' | 'warning'
+
+const months = [
+  { value: 1, label: 'Janeiro' },
+  { value: 2, label: 'Fevereiro' },
+  { value: 3, label: 'Março' },
+  { value: 4, label: 'Abril' },
+  { value: 5, label: 'Maio' },
+  { value: 6, label: 'Junho' },
+  { value: 7, label: 'Julho' },
+  { value: 8, label: 'Agosto' },
+  { value: 9, label: 'Setembro' },
+  { value: 10, label: 'Outubro' },
+  { value: 11, label: 'Novembro' },
+  { value: 12, label: 'Dezembro' },
+]
 
 function KpiCard({
   title,
@@ -60,22 +86,56 @@ function LoadingGrid() {
 }
 
 export default function DashboardPage() {
+  const now = new Date()
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState(now.getFullYear())
+
   const query = useQuery({
-    queryKey: ['dashboard', 'overview'],
-    queryFn: getDashboardOverview,
+    queryKey: ['dashboard', 'monthly', month, year],
+    queryFn: () => getDashboardMonthly(month, year),
   })
+
+  const payrollEmployees = query.data?.payroll.employees ?? []
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Visão financeira por regime de caixa.</p>
+          <p className="text-sm text-muted-foreground">
+            Visão mensal de caixa, compromissos e folha de funcionários.
+          </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>
-          <RefreshCcw className="h-4 w-4" />
-          Atualizar
-        </Button>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="space-y-2">
+            <Label htmlFor="dashboard-month">Mês</Label>
+            <Select id="dashboard-month" value={String(month)} onChange={(event) => setMonth(Number(event.target.value))}>
+              {months.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dashboard-year">Ano</Label>
+            <Input
+              id="dashboard-year"
+              type="number"
+              min="2000"
+              max="2100"
+              value={year}
+              onChange={(event) => setYear(Number(event.target.value))}
+            />
+          </div>
+
+          <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+            <RefreshCcw className="h-4 w-4" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {query.isLoading && <LoadingGrid />}
@@ -85,7 +145,7 @@ export default function DashboardPage() {
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p className="font-medium">Não foi possível carregar o dashboard.</p>
+              <p className="font-medium">Não foi possível carregar o dashboard mensal.</p>
             </div>
             <Button type="button" variant="outline" onClick={() => void query.refetch()}>
               Tentar novamente
@@ -95,67 +155,99 @@ export default function DashboardPage() {
       )}
 
       {query.data && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <KpiCard title="Saldo total" value={formatCurrency(query.data.totalBalance)} icon={Wallet} />
-          <KpiCard
-            title="Receitas recebidas"
-            value={formatCurrency(query.data.revenueTotal)}
-            icon={ArrowUpCircle}
-            tone="positive"
-          />
-          <KpiCard
-            title="Saídas pagas"
-            value={formatCurrency(query.data.expenseTotal)}
-            icon={ArrowDownCircle}
-            tone="negative"
-          />
-          <KpiCard
-            title="Resultado líquido"
-            value={formatCurrency(query.data.netResult)}
-            icon={Landmark}
-            tone={query.data.netResult >= 0 ? 'positive' : 'negative'}
-          />
-          <KpiCard
-            title="Recebíveis pendentes"
-            value={formatCurrency(query.data.pendingReceivables)}
-            icon={ArrowUpCircle}
-          />
-          <KpiCard
-            title="Despesas e boletos pendentes"
-            value={formatCurrency(query.data.pendingPayables)}
-            icon={ArrowDownCircle}
-            tone="warning"
-          />
-          <KpiCard
-            title="Vencidos"
-            value={formatCurrency(query.data.overdueTotal)}
-            icon={AlertCircle}
-            tone="negative"
-          />
-          <KpiCard title="Safras ativas" value={String(query.data.activeSafras)} icon={Sprout} />
-          <KpiCard
-            title="Boletos a vencer em 7 dias"
-            value={`${query.data.billsDueSoon.count} / ${formatCurrency(query.data.billsDueSoon.total)}`}
-            icon={CalendarClock}
-            tone="warning"
-          />
-        </div>
-      )}
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <KpiCard
+              title="Receitas realizadas"
+              value={formatCurrency(query.data.realizedRevenue)}
+              icon={ArrowUpCircle}
+              tone="positive"
+            />
+            <KpiCard title="Receitas pendentes" value={formatCurrency(query.data.pendingRevenue)} icon={CalendarClock} />
+            <KpiCard
+              title="Saídas pagas"
+              value={formatCurrency(query.data.realizedOutflows)}
+              icon={ArrowDownCircle}
+              tone="negative"
+            />
+            <KpiCard
+              title="Despesas e boletos pendentes"
+              value={formatCurrency(query.data.pendingExpenses + query.data.pendingBills)}
+              icon={WalletCards}
+              tone="warning"
+            />
+            <KpiCard title="Folha prevista" value={formatCurrency(query.data.payroll.payrollExpected)} icon={UserRound} />
+            <KpiCard
+              title="Folha já paga"
+              value={formatCurrency(query.data.payroll.payrollTotalPaid)}
+              icon={UserRound}
+              tone="negative"
+            />
+            <KpiCard
+              title="Falta pagar folha"
+              value={formatCurrency(query.data.payroll.payrollRemaining)}
+              icon={UserRound}
+              tone="warning"
+            />
+            <KpiCard
+              title="Resultado realizado"
+              value={formatCurrency(query.data.realizedResult)}
+              icon={Landmark}
+              tone={query.data.realizedResult >= 0 ? 'positive' : 'negative'}
+            />
+            <KpiCard
+              title="Resultado previsto"
+              value={formatCurrency(query.data.projectedResult)}
+              icon={Landmark}
+              tone={query.data.projectedResult >= 0 ? 'positive' : 'negative'}
+            />
+          </div>
 
-      {query.data &&
-        Object.values({
-          totalBalance: query.data.totalBalance,
-          revenueTotal: query.data.revenueTotal,
-          expenseTotal: query.data.expenseTotal,
-          pendingReceivables: query.data.pendingReceivables,
-          pendingPayables: query.data.pendingPayables,
-        }).every((value) => Number(value) === 0) && (
           <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              Nenhum movimento financeiro encontrado para o período atual.
+            <CardHeader>
+              <CardTitle>Folha do mês</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Mensalistas ativos entram automaticamente na folha prevista. Diaristas aparecem apenas pelo total pago
+                enquanto não houver módulo de dias trabalhados.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {payrollEmployees.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum funcionário ou pagamento encontrado para este mês.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[820px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
+                        <th className="px-4 py-3">Funcionário</th>
+                        <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3 text-right">Salário previsto</th>
+                        <th className="px-4 py-3 text-right">Pago salário</th>
+                        <th className="px-4 py-3 text-right">Extras</th>
+                        <th className="px-4 py-3 text-right">Total pago</th>
+                        <th className="px-4 py-3 text-right">Falta pagar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payrollEmployees.map((employee) => (
+                        <tr key={employee.employeeId} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-4 py-3 font-medium">{employee.employeeName}</td>
+                          <td className="px-4 py-3">{formatEmployeeType(employee.employeeType)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(employee.expectedSalary)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(employee.salaryPaid)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(employee.extrasPaid + employee.dailyPaid)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(employee.totalPaid)}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(employee.remainingSalary)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
+        </>
+      )}
     </div>
   )
 }

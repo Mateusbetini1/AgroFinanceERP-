@@ -151,7 +151,9 @@ export function RevenueForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="revenue-received-at">Data do recebimento</Label>
+          <Label htmlFor="revenue-received-at">
+            {status === 'RECEIVED' ? 'Data do recebimento' : 'Data prevista de recebimento'}
+          </Label>
           <Input
             id="revenue-received-at"
             type="date"

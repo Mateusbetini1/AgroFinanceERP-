@@ -30,7 +30,7 @@ export function RevenuesTable({
     },
     { header: 'Conta', cell: (revenue) => revenue.account?.name ?? '-' },
     { header: 'Data', cell: (revenue) => formatDate(revenue.date) },
-    { header: 'Recebimento', cell: (revenue) => formatDate(revenue.receivedAt) },
+    { header: 'Prev./Recebimento', cell: (revenue) => formatDate(revenue.receivedAt) },
     {
       header: '',
       className: 'text-right',

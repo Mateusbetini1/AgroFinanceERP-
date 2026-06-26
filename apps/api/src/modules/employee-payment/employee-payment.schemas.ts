@@ -49,8 +49,14 @@ export const listEmployeePaymentsSchema = paginationSchema.extend({
   dateTo: z.coerce.date().optional(),
 })
 
+export const payrollSummaryQuerySchema = z.object({
+  month: z.coerce.number().int().min(1).max(12),
+  year: z.coerce.number().int().min(2000).max(2100),
+})
+
 export const employeePaymentParamsSchema = z.object({ id: uuidSchema })
 
 export type CreateEmployeePaymentDto = z.infer<typeof createEmployeePaymentSchema>
 export type UpdateEmployeePaymentDto = z.infer<typeof updateEmployeePaymentSchema>
 export type ListEmployeePaymentsQuery = z.infer<typeof listEmployeePaymentsSchema>
+export type PayrollSummaryQuery = z.infer<typeof payrollSummaryQuerySchema>
