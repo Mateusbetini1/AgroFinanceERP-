@@ -63,6 +63,11 @@ export function formatAccountType(type: string | null | undefined): string {
   return type === 'CASH' ? 'Caixa' : type === 'BANK' ? 'Banco' : type
 }
 
+export function formatEmployeeType(type: string | null | undefined): string {
+  if (!type) return '-'
+  return type === 'MONTHLY' ? 'Mensalista' : type === 'DAILY' ? 'Diarista' : type
+}
+
 export function formatUnit(unit: string | null | undefined): string {
   if (!unit) return '-'
 

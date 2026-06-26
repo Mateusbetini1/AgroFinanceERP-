@@ -29,10 +29,10 @@ const enabledItems = [
   { href: '/bills', label: 'Boletos', icon: FileText },
   { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
   { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
+  { href: '/employees', label: 'Funcionários', icon: Users },
 ]
 
 const upcomingItems = [
-  { label: 'Funcionários', icon: Users },
   { label: 'Safras', icon: Sprout },
   { label: 'Relatórios', icon: FileText },
 ]
