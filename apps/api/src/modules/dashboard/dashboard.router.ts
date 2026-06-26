@@ -21,6 +21,16 @@ export const dashboardRouter = Router()
 dashboardRouter.use(authenticate)
 dashboardRouter.use(requireCompany)
 
+// GET /api/v1/dashboard/live
+dashboardRouter.get(
+  '/live',
+  anyMember,
+  asyncHandler(async (req, res) => {
+    const data = await DashboardService.live(req.company!.id)
+    res.json({ success: true, data })
+  }),
+)
+
 // GET /api/v1/dashboard/monthly
 dashboardRouter.get(
   '/monthly',

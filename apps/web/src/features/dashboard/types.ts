@@ -58,3 +58,83 @@ export interface DashboardMonthly {
   projectedResult: number
   payroll: PayrollSummary
 }
+
+export interface DashboardLiveAccountBalance {
+  accountId: string
+  accountName: string
+  type: string
+  currentBalance: number
+  active: boolean
+}
+
+export interface DashboardLiveAccountProjection {
+  accountId: string
+  accountName: string
+  type: string
+  currentBalance: number
+  projectedChange: number
+  projectedBalance: number
+}
+
+export interface DashboardLiveAlert {
+  type: string
+  severity: 'info' | 'warning' | 'critical'
+  message: string
+  amount?: number
+  accountId?: string
+  accountName?: string
+  relatedEntityType?: string
+  relatedEntityId?: string
+}
+
+export interface DashboardLiveMovement {
+  id: string
+  type: 'REVENUE' | 'EXPENSE' | 'BILL' | 'EMPLOYEE_PAYMENT' | 'TRANSFER'
+  date: string
+  description: string
+  amount: number
+  direction: 'INFLOW' | 'OUTFLOW' | 'TRANSFER'
+  accountName?: string
+  fromAccountName?: string
+  toAccountName?: string
+  relatedEntityType: string
+  relatedEntityId: string
+}
+
+export interface DashboardLive {
+  position: {
+    totalBalance: number
+    balancesByAccount: DashboardLiveAccountBalance[]
+  }
+  today: {
+    todayInflow: number
+    todayOutflow: number
+    todayNetMovement: number
+    todayTransfers: number
+  }
+  commitments: {
+    receivablesNext7Days: number
+    payablesNext7Days: number
+    overduePayables: number
+    overdueReceivables: number
+    receivablesNext30Days: number
+    payablesNext30Days: number
+    payrollRemainingCurrentMonth: number
+    unassignedReceivables7Days: number
+    unassignedPayables7Days: number
+    unassignedReceivables30Days: number
+    unassignedPayables30Days: number
+  }
+  projection: {
+    projectedBalance7Days: number
+    projectedBalance30Days: number
+    projectedByAccount7Days: DashboardLiveAccountProjection[]
+    projectedByAccount30Days: DashboardLiveAccountProjection[]
+    unassignedReceivables7Days: number
+    unassignedPayables7Days: number
+    unassignedReceivables30Days: number
+    unassignedPayables30Days: number
+  }
+  alerts: DashboardLiveAlert[]
+  recentMovements: DashboardLiveMovement[]
+}

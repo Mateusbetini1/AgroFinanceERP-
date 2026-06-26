@@ -17,7 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { getDashboardMonthly } from '@/features/dashboard/api'
+import { getDashboardLive, getDashboardMonthly } from '@/features/dashboard/api'
+import { FinancialPositionSection } from '@/features/dashboard/components/financial-position-section'
 import { formatCurrency, formatEmployeeType } from '@/lib/utils'
 
 type KpiTone = 'default' | 'positive' | 'negative' | 'warning'
@@ -90,6 +91,11 @@ export default function DashboardPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
 
+  const liveQuery = useQuery({
+    queryKey: ['dashboard', 'live'],
+    queryFn: getDashboardLive,
+  })
+
   const query = useQuery({
     queryKey: ['dashboard', 'monthly', month, year],
     queryFn: () => getDashboardMonthly(month, year),
@@ -103,7 +109,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Visão mensal de caixa, compromissos e folha de funcionários.
+            Visão financeira atual, compromissos, projeções e folha de funcionários.
           </p>
         </div>
 
@@ -133,9 +139,23 @@ export default function DashboardPage() {
 
           <Button type="button" variant="outline" onClick={() => void query.refetch()}>
             <RefreshCcw className="h-4 w-4" />
-            Atualizar
+            Atualizar mês
           </Button>
         </div>
+      </div>
+
+      <FinancialPositionSection
+        data={liveQuery.data}
+        isLoading={liveQuery.isLoading}
+        isError={liveQuery.isError}
+        onRetry={() => void liveQuery.refetch()}
+      />
+
+      <div>
+        <h2 className="text-xl font-semibold tracking-normal text-foreground">Visão mensal</h2>
+        <p className="text-sm text-muted-foreground">
+          Caixa realizado, pendências e folha do mês selecionado.
+        </p>
       </div>
 
       {query.isLoading && <LoadingGrid />}
