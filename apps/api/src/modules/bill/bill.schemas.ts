@@ -26,6 +26,25 @@ export const createBillSchema = z
     { message: 'accountId é obrigatório quando status é PAID', path: ['accountId'] },
   )
 
+export const createBillInstallmentsSchema = z.object({
+  supplierId: uuidSchema.optional(),
+  accountId: uuidSchema.optional(),
+  description: z
+    .string({ required_error: 'Descricao e obrigatoria' })
+    .min(1, 'Descricao nao pode ser vazia')
+    .max(500, 'Descricao deve ter no maximo 500 caracteres')
+    .trim(),
+  totalAmount: z
+    .number({ required_error: 'Valor total e obrigatorio' })
+    .positive('Valor total deve ser maior que zero'),
+  installmentCount: z
+    .number({ required_error: 'Quantidade de parcelas e obrigatoria' })
+    .int('Quantidade de parcelas deve ser um numero inteiro')
+    .min(2, 'Quantidade de parcelas deve ser no minimo 2'),
+  firstDueDate: z.coerce.date({ required_error: 'Primeiro vencimento e obrigatorio' }),
+  fileUrl: z.string().url('URL do arquivo invalida').optional(),
+})
+
 export const updateBillSchema = z
   .object({
     billGroupId: uuidSchema.nullable().optional(),
@@ -58,5 +77,6 @@ export const listBillsSchema = paginationSchema.extend({
 export const billParamsSchema = z.object({ id: uuidSchema })
 
 export type CreateBillDto = z.infer<typeof createBillSchema>
+export type CreateBillInstallmentsDto = z.infer<typeof createBillInstallmentsSchema>
 export type UpdateBillDto = z.infer<typeof updateBillSchema>
 export type ListBillsQuery = z.infer<typeof listBillsSchema>

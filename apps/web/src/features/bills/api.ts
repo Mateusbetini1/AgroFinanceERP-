@@ -14,6 +14,30 @@ export interface BillPayload {
   installmentCount?: number | null
 }
 
+export interface BillInstallmentsPayload {
+  supplierId?: string
+  accountId?: string
+  description: string
+  totalAmount: number
+  installmentCount: number
+  firstDueDate: string
+  fileUrl?: string
+}
+
+export interface BillInstallmentsResult {
+  group: {
+    id: string
+    companyId: string
+    supplierId: string | null
+    description: string
+    totalAmount: number | string
+    installmentCount: number
+    createdAt: string
+    updatedAt: string
+  }
+  bills: Bill[]
+}
+
 function cleanCreateBillPayload(payload: BillPayload): BillPayload {
   const clean: BillPayload = {
     description: payload.description,
@@ -58,6 +82,21 @@ function cleanUpdateBillPayload(payload: BillPayload): BillPayload {
   return clean
 }
 
+function cleanCreateBillInstallmentsPayload(payload: BillInstallmentsPayload): BillInstallmentsPayload {
+  const clean: BillInstallmentsPayload = {
+    description: payload.description,
+    totalAmount: payload.totalAmount,
+    installmentCount: payload.installmentCount,
+    firstDueDate: payload.firstDueDate,
+  }
+
+  if (payload.supplierId) clean.supplierId = payload.supplierId
+  if (payload.accountId) clean.accountId = payload.accountId
+  if (payload.fileUrl) clean.fileUrl = payload.fileUrl
+
+  return clean
+}
+
 export async function listBills() {
   const { data } = await api.get<PaginatedResponse<Bill>>('/bills')
   return data
@@ -65,6 +104,14 @@ export async function listBills() {
 
 export async function createBill(payload: BillPayload) {
   const { data } = await api.post<ApiResponse<Bill>>('/bills', cleanCreateBillPayload(payload))
+  return data.data
+}
+
+export async function createBillInstallments(payload: BillInstallmentsPayload) {
+  const { data } = await api.post<ApiResponse<BillInstallmentsResult>>(
+    '/bills/installments',
+    cleanCreateBillInstallmentsPayload(payload),
+  )
   return data.data
 }
 

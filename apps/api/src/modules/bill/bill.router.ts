@@ -7,6 +7,7 @@ import { validate } from '../../shared/middleware/validate'
 import { asyncHandler } from '../../shared/utils/async-handler'
 import {
   createBillSchema,
+  createBillInstallmentsSchema,
   updateBillSchema,
   listBillsSchema,
   billParamsSchema,
@@ -40,6 +41,17 @@ billRouter.post(
   asyncHandler(async (req, res) => {
     const bill = await BillService.create(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: bill })
+  }),
+)
+
+// POST /api/v1/bills/installments
+billRouter.post(
+  '/installments',
+  financialAccess,
+  validate(createBillInstallmentsSchema),
+  asyncHandler(async (req, res) => {
+    const result = await BillService.createInstallments(req.company!.id, req.body, req)
+    res.status(201).json({ success: true, data: result })
   }),
 )
 

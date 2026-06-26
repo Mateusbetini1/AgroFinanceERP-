@@ -4,9 +4,14 @@ import { RowActions } from '@/components/data/row-actions'
 import { formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
 import type { Bill } from '@/types/api'
 
-function formatInstallment(bill: Bill) {
-  if (!bill.installmentNumber && !bill.installmentCount) return '-'
-  return `${bill.installmentNumber ?? '-'} / ${bill.installmentCount ?? '-'}`
+function InstallmentBadge({ bill }: { bill: Bill }) {
+  if (!bill.installmentNumber || !bill.installmentCount) return <span>-</span>
+
+  return (
+    <Badge variant="secondary">
+      {bill.installmentNumber}/{bill.installmentCount}
+    </Badge>
+  )
 }
 
 export function BillsTable({
@@ -27,7 +32,7 @@ export function BillsTable({
     { header: 'Valor', cell: (bill) => formatCurrency(bill.amount), className: 'text-right' },
     { header: 'Vencimento', cell: (bill) => formatDate(bill.dueDate) },
     { header: 'Pagamento', cell: (bill) => formatDate(bill.paidAt) },
-    { header: 'Parcela', cell: formatInstallment },
+    { header: 'Parcela', cell: (bill) => <InstallmentBadge bill={bill} /> },
     {
       header: 'Status',
       cell: (bill) => (

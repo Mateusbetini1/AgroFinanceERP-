@@ -6,8 +6,15 @@ import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
 import { listAccounts } from '@/features/accounts/api'
-import { createBill, deleteBill, listBills, updateBill, type BillPayload } from '@/features/bills/api'
-import { BillForm } from '@/features/bills/components/bill-form'
+import {
+  createBill,
+  createBillInstallments,
+  deleteBill,
+  listBills,
+  updateBill,
+  type BillPayload,
+} from '@/features/bills/api'
+import { BillForm, type BillFormSubmit } from '@/features/bills/components/bill-form'
 import { BillsTable } from '@/features/bills/components/bills-table'
 import { listSuppliers } from '@/features/suppliers/api'
 import { getApiErrorMessage } from '@/lib/utils'
@@ -40,6 +47,16 @@ export default function BillsPage() {
       await invalidate()
       setDialogOpen(false)
       setFeedback({ type: 'success', message: 'Boleto criado com sucesso.' })
+    },
+    onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
+  })
+
+  const createInstallmentsMutation = useMutation({
+    mutationFn: createBillInstallments,
+    onSuccess: async () => {
+      await invalidate()
+      setDialogOpen(false)
+      setFeedback({ type: 'success', message: 'Parcelamento criado com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
   })
@@ -83,9 +100,14 @@ export default function BillsPage() {
     deleteMutation.mutate(bill.id)
   }
 
-  function handleSubmit(payload: BillPayload) {
-    if (editing) updateMutation.mutate({ id: editing.id, payload })
-    else createMutation.mutate(payload)
+  function handleSubmit(submission: BillFormSubmit) {
+    if (editing) {
+      if (submission.mode === 'single') updateMutation.mutate({ id: editing.id, payload: submission.payload })
+      return
+    }
+
+    if (submission.mode === 'installments') createInstallmentsMutation.mutate(submission.payload)
+    else createMutation.mutate(submission.payload)
   }
 
   const isAuxLoading = suppliersQuery.isLoading || accountsQuery.isLoading
@@ -125,7 +147,12 @@ export default function BillsPage() {
             initialValue={editing}
             suppliers={suppliers}
             accounts={accounts}
-            isSubmitting={createMutation.isPending || updateMutation.isPending || isAuxLoading}
+            isSubmitting={
+              createMutation.isPending ||
+              createInstallmentsMutation.isPending ||
+              updateMutation.isPending ||
+              isAuxLoading
+            }
             onSubmit={handleSubmit}
             onCancel={() => setDialogOpen(false)}
           />

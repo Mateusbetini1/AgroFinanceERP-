@@ -5,7 +5,12 @@ import { AppError } from '../../shared/errors/AppError'
 import { getPaginationArgs, buildPaginatedResponse } from '../../shared/utils/pagination'
 import { writeAuditLog } from '../../shared/middleware/audit-log'
 import { AuditAction } from '@agrofinance/shared'
-import type { CreateBillDto, UpdateBillDto, ListBillsQuery } from './bill.schemas'
+import type {
+  CreateBillDto,
+  CreateBillInstallmentsDto,
+  UpdateBillDto,
+  ListBillsQuery,
+} from './bill.schemas'
 
 const BILL_SELECT = {
   id: true,
@@ -27,6 +32,47 @@ const BILL_SELECT = {
 } as const
 
 // ── FK validators ────────────────────────────────────────────────────────────
+
+const BILL_GROUP_SELECT = {
+  id: true,
+  companyId: true,
+  supplierId: true,
+  description: true,
+  totalAmount: true,
+  installmentCount: true,
+  createdAt: true,
+  updatedAt: true,
+} as const
+
+function distributeInstallmentAmounts(totalAmount: number, installmentCount: number): number[] {
+  const totalCents = Math.round(totalAmount * 100)
+  const baseCents = Math.floor(totalCents / installmentCount)
+  const remainderCents = totalCents % installmentCount
+
+  return Array.from({ length: installmentCount }, (_, index) => {
+    const cents = baseCents + (index === installmentCount - 1 ? remainderCents : 0)
+    return cents / 100
+  })
+}
+
+function addMonthsClamped(date: Date, months: number): Date {
+  const targetYear = date.getUTCFullYear()
+  const targetMonth = date.getUTCMonth() + months
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+  const targetDay = Math.min(date.getUTCDate(), lastDayOfTargetMonth)
+
+  return new Date(
+    Date.UTC(
+      targetYear,
+      targetMonth,
+      targetDay,
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds(),
+      date.getUTCMilliseconds(),
+    ),
+  )
+}
 
 async function validateSupplierId(companyId: string, supplierId: string): Promise<void> {
   const exists = await prisma.supplier.findFirst({
@@ -191,6 +237,60 @@ export const BillService = {
     })
 
     return bill
+  },
+
+  async createInstallments(companyId: string, data: CreateBillInstallmentsDto, req: Request) {
+    const validations: Promise<void>[] = []
+    if (data.supplierId) validations.push(validateSupplierId(companyId, data.supplierId))
+    if (data.accountId) validations.push(validateAccountId(companyId, data.accountId))
+    await Promise.all(validations)
+
+    const amounts = distributeInstallmentAmounts(data.totalAmount, data.installmentCount)
+
+    const result = await prisma.$transaction(async (tx) => {
+      const group = await tx.billGroup.create({
+        data: {
+          companyId,
+          supplierId: data.supplierId,
+          description: data.description,
+          totalAmount: data.totalAmount,
+          installmentCount: data.installmentCount,
+        },
+        select: BILL_GROUP_SELECT,
+      })
+
+      const bills = []
+      for (let index = 0; index < data.installmentCount; index += 1) {
+        const bill = await tx.bill.create({
+          data: {
+            companyId,
+            billGroupId: group.id,
+            supplierId: data.supplierId,
+            accountId: data.accountId,
+            description: data.description,
+            amount: amounts[index],
+            dueDate: addMonthsClamped(data.firstDueDate, index),
+            status: 'PENDING',
+            installmentNumber: index + 1,
+            installmentCount: data.installmentCount,
+            fileUrl: data.fileUrl,
+          },
+          select: BILL_SELECT,
+        })
+        bills.push(bill)
+      }
+
+      return { group, bills }
+    })
+
+    await writeAuditLog(req, {
+      action: AuditAction.CREATE,
+      entityType: 'BillGroup',
+      entityId: result.group.id,
+      after: result,
+    })
+
+    return result
   },
 
   async update(companyId: string, id: string, data: UpdateBillDto, req: Request) {
