@@ -228,12 +228,15 @@ export interface Employee {
 
 export interface Transfer {
   id: string
-  fromAccount: { name: string }
-  toAccount: { name: string }
-  amount: number
+  fromAccountId: string
+  fromAccount: { id?: string; name: string; type?: AccountType }
+  toAccountId: string
+  toAccount: { id?: string; name: string; type?: AccountType }
+  amount: number | string
   date: string
   description: string | null
   createdAt: string
+  updatedAt: string
 }
 
 // ── Safra ────────────────────────────────────────────────────────────────────
