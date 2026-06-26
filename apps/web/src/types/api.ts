@@ -163,13 +163,17 @@ export type ExpenseStatus = 'PENDING' | 'PAID' | 'OVERDUE'
 
 export interface Expense {
   id: string
+  categoryId: string
+  supplierId: string | null
+  accountId: string | null
+  safraId: string | null
   date: string
   dueDate: string | null
   paidAt: string | null
   description: string
-  category: { name: string }
-  supplier: { name: string } | null
-  account: { name: string } | null
+  category: { id?: string; name: string; type?: CategoryType }
+  supplier: { id?: string; name: string } | null
+  account: { id?: string; name: string; type?: AccountType } | null
   amount: number | string
   status: ExpenseStatus
   attachmentUrl: string | null
