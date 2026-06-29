@@ -30,14 +30,13 @@ const enabledItems = [
   { href: '/bills', label: 'Boletos', icon: FileText },
   { href: '/safras', label: 'Safras', icon: Sprout },
   { href: '/farm-locations', label: 'Locais', icon: MapPin },
+  { href: '/reports/safras', label: 'Relatorios', icon: FileText },
   { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
   { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
   { href: '/employees', label: 'Funcionários', icon: Users },
 ]
 
-const upcomingItems = [
-  { label: 'Relatórios', icon: FileText },
-]
+const upcomingItems: Array<{ label: string; icon: typeof FileText }> = []
 
 export function Sidebar() {
   const pathname = usePathname()

@@ -39,7 +39,10 @@ export const safraReportSchema = z.object({
   farmLocationId: uuidSchema.optional(),
   status: z.enum(['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED']).optional(),
   safraId: uuidSchema.optional(),
+  search: z.string().trim().optional(),
 })
+
+export const safraReportParamsSchema = z.object({ id: uuidSchema })
 
 export const cashflowReportSchema = z.object({
   dateFrom: z.coerce.date().optional(),
@@ -69,5 +72,6 @@ export type RevenueReportQuery = z.infer<typeof revenueReportSchema>
 export type ExpenseReportQuery = z.infer<typeof expenseReportSchema>
 export type BillReportQuery = z.infer<typeof billReportSchema>
 export type SafraReportQuery = z.infer<typeof safraReportSchema>
+export type SafraReportParams = z.infer<typeof safraReportParamsSchema>
 export type CashflowReportQuery = z.infer<typeof cashflowReportSchema>
 export type AccountsReportQuery = z.infer<typeof accountsReportSchema>

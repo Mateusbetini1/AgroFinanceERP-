@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma'
+import { AppError } from '../../shared/errors/AppError'
 import type {
   RevenueReportQuery,
   ExpenseReportQuery,
@@ -48,6 +49,16 @@ function cashDateFallbackWhere(primaryField: string, fallbackField: string, boun
 
 function toNumber(value: unknown): number {
   return Number(value ?? 0)
+}
+
+function addToBucket(map: Map<string, number>, key: string, amount: unknown): void {
+  map.set(key, (map.get(key) ?? 0) + toNumber(amount))
+}
+
+function perEstimatedUnit(value: number, estimatedYield: unknown): number | null {
+  const yieldValue = toNumber(estimatedYield)
+  if (!Number.isFinite(yieldValue) || yieldValue <= 0) return null
+  return value / yieldValue
 }
 
 function emptyReport(format: 'json' | 'csv') {
@@ -255,6 +266,7 @@ export const ReportService = {
         ...(query.productId ? { productId: query.productId } : {}),
         ...(query.farmLocationId ? { farmLocationId: query.farmLocationId } : {}),
         ...(query.status ? { status: query.status } : {}),
+        ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
         ...(bounds ? { startDate: bounds } : {}),
       },
       select: {
@@ -264,41 +276,195 @@ export const ReportService = {
         startDate: true,
         endDate: true,
         estimatedYield: true,
-        product: { select: { id: true, name: true } },
+        product: { select: { id: true, name: true, unit: true } },
         farmLocation: { select: { id: true, name: true, type: true } },
       },
       orderBy: { startDate: 'desc' },
     })
 
     const safraIds = safras.map((safra) => safra.id)
+    if (safraIds.length === 0) return { data: [], count: 0 }
+
     const [revenues, expenses] = await Promise.all([
-      prisma.revenue.groupBy({
-        by: ['safraId'],
+      prisma.revenue.findMany({
         where: { companyId, deletedAt: null, safraId: { in: safraIds } },
-        _sum: { totalAmount: true },
+        select: { safraId: true, status: true, totalAmount: true },
       }),
-      prisma.expense.groupBy({
-        by: ['safraId'],
+      prisma.expense.findMany({
         where: { companyId, deletedAt: null, safraId: { in: safraIds } },
-        _sum: { amount: true },
+        select: { safraId: true, status: true, amount: true },
       }),
     ])
 
-    const revenueBySafra = new Map(revenues.filter((item) => item.safraId).map((item) => [item.safraId!, toNumber(item._sum.totalAmount)]))
-    const expenseBySafra = new Map(expenses.filter((item) => item.safraId).map((item) => [item.safraId!, toNumber(item._sum.amount)]))
+    const receivedRevenueBySafra = new Map<string, number>()
+    const pendingRevenueBySafra = new Map<string, number>()
+    const paidExpensesBySafra = new Map<string, number>()
+    const pendingExpensesBySafra = new Map<string, number>()
+
+    for (const revenue of revenues) {
+      if (!revenue.safraId) continue
+      if (revenue.status === 'RECEIVED') addToBucket(receivedRevenueBySafra, revenue.safraId, revenue.totalAmount)
+      if (revenue.status === 'PENDING') addToBucket(pendingRevenueBySafra, revenue.safraId, revenue.totalAmount)
+    }
+
+    for (const expense of expenses) {
+      if (!expense.safraId) continue
+      if (expense.status === 'PAID') addToBucket(paidExpensesBySafra, expense.safraId, expense.amount)
+      if (expense.status === 'PENDING' || expense.status === 'OVERDUE') {
+        addToBucket(pendingExpensesBySafra, expense.safraId, expense.amount)
+      }
+    }
 
     const data = safras.map((safra) => {
-      const revenueTotal = revenueBySafra.get(safra.id) ?? 0
-      const expenseTotal = expenseBySafra.get(safra.id) ?? 0
+      const receivedRevenue = receivedRevenueBySafra.get(safra.id) ?? 0
+      const pendingRevenue = pendingRevenueBySafra.get(safra.id) ?? 0
+      const totalRevenue = receivedRevenue + pendingRevenue
+      const paidExpenses = paidExpensesBySafra.get(safra.id) ?? 0
+      const pendingExpenses = pendingExpensesBySafra.get(safra.id) ?? 0
+      const totalExpenses = paidExpenses + pendingExpenses
+      const realizedResult = receivedRevenue - paidExpenses
+      const projectedResult = totalRevenue - totalExpenses
+
       return {
-        ...safra,
-        revenueTotal,
-        expenseTotal,
-        result: revenueTotal - expenseTotal,
+        safraId: safra.id,
+        safraName: safra.name,
+        product: safra.product,
+        farmLocation: safra.farmLocation,
+        status: safra.status,
+        startDate: safra.startDate,
+        endDate: safra.endDate,
+        estimatedYield: safra.estimatedYield === null ? null : toNumber(safra.estimatedYield),
+        receivedRevenue,
+        pendingRevenue,
+        totalRevenue,
+        paidExpenses,
+        pendingExpenses,
+        totalExpenses,
+        realizedResult,
+        projectedResult,
+        costPerEstimatedUnit: perEstimatedUnit(totalExpenses, safra.estimatedYield),
+        revenuePerEstimatedUnit: perEstimatedUnit(totalRevenue, safra.estimatedYield),
+        resultPerEstimatedUnit: perEstimatedUnit(projectedResult, safra.estimatedYield),
+        revenueTotal: totalRevenue,
+        expenseTotal: totalExpenses,
+        result: projectedResult,
       }
     })
 
     return { data, count: data.length }
+  },
+
+  async safraDetail(companyId: string, id: string) {
+    const list = await ReportService.safras(companyId, { safraId: id })
+    const summary = list.data[0]
+    if (!summary) throw AppError.notFound('Safra')
+
+    const [expenses, revenues] = await Promise.all([
+      prisma.expense.findMany({
+        where: { companyId, deletedAt: null, safraId: id },
+        select: {
+          id: true,
+          date: true,
+          dueDate: true,
+          paidAt: true,
+          description: true,
+          amount: true,
+          status: true,
+          category: { select: { id: true, name: true } },
+        },
+        orderBy: { date: 'desc' },
+      }),
+      prisma.revenue.findMany({
+        where: { companyId, deletedAt: null, safraId: id },
+        select: {
+          id: true,
+          date: true,
+          receivedAt: true,
+          totalAmount: true,
+          status: true,
+          client: true,
+          notes: true,
+          product: { select: { id: true, name: true } },
+        },
+        orderBy: { date: 'desc' },
+      }),
+    ])
+
+    const expensesByCategoryMap = new Map<string, {
+      categoryId: string
+      categoryName: string
+      paidAmount: number
+      pendingAmount: number
+      totalAmount: number
+    }>()
+
+    for (const expense of expenses) {
+      const current = expensesByCategoryMap.get(expense.category.id) ?? {
+        categoryId: expense.category.id,
+        categoryName: expense.category.name,
+        paidAmount: 0,
+        pendingAmount: 0,
+        totalAmount: 0,
+      }
+      const amount = toNumber(expense.amount)
+      if (expense.status === 'PAID') current.paidAmount += amount
+      if (expense.status === 'PENDING' || expense.status === 'OVERDUE') current.pendingAmount += amount
+      current.totalAmount += amount
+      expensesByCategoryMap.set(expense.category.id, current)
+    }
+
+    const revenuesByProductClientMap = new Map<string, {
+      productId: string
+      productName: string
+      client: string | null
+      receivedAmount: number
+      pendingAmount: number
+      totalAmount: number
+    }>()
+
+    for (const revenue of revenues) {
+      const client = revenue.client ?? null
+      const key = `${revenue.product.id}:${client ?? ''}`
+      const current = revenuesByProductClientMap.get(key) ?? {
+        productId: revenue.product.id,
+        productName: revenue.product.name,
+        client,
+        receivedAmount: 0,
+        pendingAmount: 0,
+        totalAmount: 0,
+      }
+      const amount = toNumber(revenue.totalAmount)
+      if (revenue.status === 'RECEIVED') current.receivedAmount += amount
+      if (revenue.status === 'PENDING') current.pendingAmount += amount
+      current.totalAmount += amount
+      revenuesByProductClientMap.set(key, current)
+    }
+
+    const recentMovements = [
+      ...revenues.map((revenue) => ({
+        id: revenue.id,
+        type: 'REVENUE' as const,
+        date: revenue.receivedAt ?? revenue.date,
+        description: revenue.client ?? revenue.notes ?? revenue.product.name,
+        status: revenue.status,
+        amount: toNumber(revenue.totalAmount),
+      })),
+      ...expenses.map((expense) => ({
+        id: expense.id,
+        type: 'EXPENSE' as const,
+        date: expense.paidAt ?? expense.dueDate ?? expense.date,
+        description: expense.description,
+        status: expense.status,
+        amount: toNumber(expense.amount),
+      })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 20)
+
+    return {
+      summary,
+      expensesByCategory: Array.from(expensesByCategoryMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+      revenuesByProductClient: Array.from(revenuesByProductClientMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+      recentMovements,
+    }
   },
 
   async cashflow(companyId: string, query: CashflowReportQuery) {

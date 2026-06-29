@@ -10,12 +10,14 @@ import {
   expenseReportSchema,
   billReportSchema,
   safraReportSchema,
+  safraReportParamsSchema,
   cashflowReportSchema,
   accountsReportSchema,
   type RevenueReportQuery,
   type ExpenseReportQuery,
   type BillReportQuery,
   type SafraReportQuery,
+  type SafraReportParams,
   type CashflowReportQuery,
   type AccountsReportQuery,
 } from './report.schemas'
@@ -92,6 +94,20 @@ reportRouter.get(
       req.query as unknown as SafraReportQuery,
     )
     res.json({ success: true, count: result.count, data: result.data })
+  }),
+)
+
+// GET /api/v1/reports/safras/:id
+reportRouter.get(
+  '/safras/:id',
+  anyMember,
+  validate(safraReportParamsSchema, 'params'),
+  asyncHandler(async (req, res) => {
+    const result = await ReportService.safraDetail(
+      req.company!.id,
+      (req.params as unknown as SafraReportParams).id,
+    )
+    res.json({ success: true, data: result })
   }),
 )
 
