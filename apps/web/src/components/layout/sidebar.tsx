@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   ArrowLeftRight,
   BarChart3,
+  CalendarClock,
   CreditCard,
   FileText,
   HandCoins,
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils'
 
 const enabledItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/cashflow/forecast', label: 'Fluxo Projetado', icon: CalendarClock },
   { href: '/accounts', label: 'Contas', icon: CreditCard },
   { href: '/categories', label: 'Categorias', icon: Tags },
   { href: '/products', label: 'Produtos', icon: Package },

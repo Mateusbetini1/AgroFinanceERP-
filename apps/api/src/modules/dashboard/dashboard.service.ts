@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma'
-import type { DashboardQuery, CashflowQuery, PayablesQuery } from './dashboard.schemas'
+import type { DashboardQuery, CashflowQuery, ForecastQuery, PayablesQuery } from './dashboard.schemas'
 import { getPayrollSummary } from '../employee-payment/payroll-summary.service'
 import { getMonthPeriod } from '../../shared/utils/month-period'
 
@@ -46,6 +46,41 @@ type RecentMovement = {
   toAccountName?: string
   relatedEntityType: string
   relatedEntityId: string
+}
+
+type ForecastAlertLevel = 'OK' | 'WARNING' | 'NEGATIVE'
+
+type ForecastMonthDraft = {
+  year: number
+  month: number
+  projectedReceivables: number
+  projectedExpenses: number
+  projectedBills: number
+  projectedPayroll: number
+  unallocatedInflows: number
+  unallocatedOutflows: number
+}
+
+type AccountForecastDraft = {
+  accountId: string
+  accountName: string
+  type: string
+  currentBalance: number
+  months: ForecastAccountMonthDraft[]
+}
+
+type ForecastAccountMonthDraft = {
+  year: number
+  month: number
+  projectedReceivables: number
+  projectedExpenses: number
+  projectedBills: number
+}
+
+type ForecastNegativeMonth = {
+  year: number
+  month: number
+  balance: number
 }
 
 function toNumber(value: unknown): number {
@@ -247,6 +282,42 @@ function initializeBuckets(startDate: Date, endDate: Date): Map<string, MonthBuc
   }
 
   return buckets
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1)
+}
+
+function forecastMonthKey(year: number, month: number) {
+  return `${year}-${month}`
+}
+
+function clampToForecastStart(date: Date, startDate: Date) {
+  return date < startDate ? startDate : date
+}
+
+function createForecastMonthDraft(date: Date): ForecastMonthDraft {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    projectedReceivables: 0,
+    projectedExpenses: 0,
+    projectedBills: 0,
+    projectedPayroll: 0,
+    unallocatedInflows: 0,
+    unallocatedOutflows: 0,
+  }
+}
+
+function getForecastAlert(balance: number): ForecastAlertLevel {
+  if (balance < 0) return 'NEGATIVE'
+  if (balance < 1000) return 'WARNING'
+  return 'OK'
+}
+
+function getFirstNegativeMonth(months: Array<{ year: number; month: number; endingBalance: number }>): ForecastNegativeMonth | null {
+  const found = months.find((month) => month.endingBalance < 0)
+  return found ? { year: found.year, month: found.month, balance: found.endingBalance } : null
 }
 
 export const DashboardService = {
@@ -667,6 +738,307 @@ export const DashboardService = {
       },
       alerts,
       recentMovements,
+    }
+  },
+
+  async forecast(companyId: string, query: ForecastQuery) {
+    const now = new Date()
+    const startMonth = query.startMonth ?? now.getMonth() + 1
+    const startYear = query.startYear ?? now.getFullYear()
+    const startDate = new Date(startYear, startMonth - 1, 1)
+    const endDate = addMonths(startDate, query.months)
+    const lastMonthDate = addMonths(startDate, query.months - 1)
+
+    const forecastMonths: ForecastMonthDraft[] = []
+    for (let index = 0; index < query.months; index += 1) {
+      forecastMonths.push(createForecastMonthDraft(addMonths(startDate, index)))
+    }
+    const monthByKey = new Map(forecastMonths.map((month) => [forecastMonthKey(month.year, month.month), month]))
+
+    const [accounts, pendingRevenues, pendingExpenses, pendingBills, payrollByMonth] = await Promise.all([
+      prisma.account.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, type: true, currentBalance: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.revenue.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PENDING',
+          OR: [{ receivedAt: { lt: endDate } }, { receivedAt: null, date: { lt: endDate } }],
+        },
+        select: { id: true, accountId: true, date: true, receivedAt: true, totalAmount: true },
+      }),
+      prisma.expense.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          OR: [{ dueDate: { lt: endDate } }, { dueDate: null, date: { lt: endDate } }],
+        },
+        select: { id: true, accountId: true, date: true, dueDate: true, amount: true },
+      }),
+      prisma.bill.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          dueDate: { lt: endDate },
+        },
+        select: { id: true, accountId: true, dueDate: true, amount: true },
+      }),
+      Promise.all(
+        forecastMonths.map((month) =>
+          getPayrollSummary(companyId, month.month, month.year).then((payroll) => ({
+            year: month.year,
+            month: month.month,
+            payroll,
+          })),
+        ),
+      ),
+    ])
+
+    const accountDrafts = new Map<string, AccountForecastDraft>()
+    for (const account of accounts) {
+      accountDrafts.set(account.id, {
+        accountId: account.id,
+        accountName: account.name,
+        type: account.type,
+        currentBalance: toNumber(account.currentBalance),
+        months: forecastMonths.map((month) => ({
+          year: month.year,
+          month: month.month,
+          projectedReceivables: 0,
+          projectedExpenses: 0,
+          projectedBills: 0,
+        })),
+      })
+    }
+
+    const getForecastMonth = (date: Date) => {
+      const bucketDate = clampToForecastStart(date, startDate)
+      return monthByKey.get(forecastMonthKey(bucketDate.getFullYear(), bucketDate.getMonth() + 1))
+    }
+
+    const getAccountMonth = (accountId: string | null, date: Date) => {
+      if (!accountId) return null
+      const account = accountDrafts.get(accountId)
+      if (!account) return null
+      const bucketDate = clampToForecastStart(date, startDate)
+      return account.months.find((month) => month.year === bucketDate.getFullYear() && month.month === bucketDate.getMonth() + 1) ?? null
+    }
+
+    let overdueMovedToFirstMonth = 0
+    for (const revenue of pendingRevenues) {
+      const expectedDate = revenue.receivedAt ?? revenue.date
+      const month = getForecastMonth(expectedDate)
+      if (!month) continue
+      const amount = toNumber(revenue.totalAmount)
+      if (expectedDate < startDate) overdueMovedToFirstMonth += amount
+      month.projectedReceivables += amount
+      const accountMonth = getAccountMonth(revenue.accountId, expectedDate)
+      if (accountMonth) accountMonth.projectedReceivables += amount
+      else month.unallocatedInflows += amount
+    }
+
+    for (const expense of pendingExpenses) {
+      const expectedDate = expense.dueDate ?? expense.date
+      const month = getForecastMonth(expectedDate)
+      if (!month) continue
+      const amount = toNumber(expense.amount)
+      if (expectedDate < startDate) overdueMovedToFirstMonth += amount
+      month.projectedExpenses += amount
+      const accountMonth = getAccountMonth(expense.accountId, expectedDate)
+      if (accountMonth) accountMonth.projectedExpenses += amount
+      else month.unallocatedOutflows += amount
+    }
+
+    for (const bill of pendingBills) {
+      const month = getForecastMonth(bill.dueDate)
+      if (!month) continue
+      const amount = toNumber(bill.amount)
+      if (bill.dueDate < startDate) overdueMovedToFirstMonth += amount
+      month.projectedBills += amount
+      const accountMonth = getAccountMonth(bill.accountId, bill.dueDate)
+      if (accountMonth) accountMonth.projectedBills += amount
+      else month.unallocatedOutflows += amount
+    }
+
+    for (const item of payrollByMonth) {
+      const month = monthByKey.get(forecastMonthKey(item.year, item.month))
+      if (!month) continue
+      const amount = toNumber(item.payroll.payrollRemaining)
+      month.projectedPayroll += amount
+      month.unallocatedOutflows += amount
+    }
+
+    const currentTotalBalance = accounts.reduce((sum, account) => sum + toNumber(account.currentBalance), 0)
+    let totalRunningBalance = currentTotalBalance
+    const months = forecastMonths.map((month) => {
+      const startingBalance = totalRunningBalance
+      const projectedOutflows = month.projectedExpenses + month.projectedBills + month.projectedPayroll
+      const projectedNet = month.projectedReceivables - projectedOutflows
+      const endingBalance = startingBalance + projectedNet
+      totalRunningBalance = endingBalance
+
+      return {
+        year: month.year,
+        month: month.month,
+        startingBalance,
+        projectedReceivables: month.projectedReceivables,
+        projectedExpenses: month.projectedExpenses,
+        projectedBills: month.projectedBills,
+        projectedPayroll: month.projectedPayroll,
+        projectedOutflows,
+        projectedNet,
+        endingBalance,
+        unallocatedInflows: month.unallocatedInflows,
+        unallocatedOutflows: month.unallocatedOutflows,
+        alert: getForecastAlert(endingBalance),
+      }
+    })
+
+    const accountsForecast = Array.from(accountDrafts.values()).map((account) => {
+      let runningBalance = account.currentBalance
+      const accountMonths = account.months.map((month) => {
+        const startingBalance = runningBalance
+        const projectedNet = month.projectedReceivables - month.projectedExpenses - month.projectedBills
+        const endingBalance = startingBalance + projectedNet
+        runningBalance = endingBalance
+        return {
+          year: month.year,
+          month: month.month,
+          startingBalance,
+          projectedReceivables: month.projectedReceivables,
+          projectedExpenses: month.projectedExpenses,
+          projectedBills: month.projectedBills,
+          projectedNet,
+          endingBalance,
+          alert: getForecastAlert(endingBalance),
+        }
+      })
+      return {
+        accountId: account.accountId,
+        accountName: account.accountName,
+        type: account.type,
+        currentBalance: account.currentBalance,
+        finalProjectedBalance: accountMonths[accountMonths.length - 1]?.endingBalance ?? account.currentBalance,
+        lowestProjectedBalance: Math.min(...accountMonths.map((month) => month.endingBalance), account.currentBalance),
+        firstNegativeMonth: getFirstNegativeMonth(accountMonths),
+        months: accountMonths,
+      }
+    })
+
+    const unallocatedMonths = forecastMonths.map((month) => ({
+      year: month.year,
+      month: month.month,
+      receivables: month.unallocatedInflows,
+      expenses: month.projectedExpenses - accountsForecast.reduce((sum, account) => {
+        const accountMonth = account.months.find((item) => item.year === month.year && item.month === month.month)
+        return sum + (accountMonth?.projectedExpenses ?? 0)
+      }, 0),
+      bills: month.projectedBills - accountsForecast.reduce((sum, account) => {
+        const accountMonth = account.months.find((item) => item.year === month.year && item.month === month.month)
+        return sum + (accountMonth?.projectedBills ?? 0)
+      }, 0),
+      payroll: month.projectedPayroll,
+      net: month.unallocatedInflows - month.unallocatedOutflows,
+    }))
+
+    const totalReceivables = months.reduce((sum, month) => sum + month.projectedReceivables, 0)
+    const totalExpenses = months.reduce((sum, month) => sum + month.projectedExpenses, 0)
+    const totalBills = months.reduce((sum, month) => sum + month.projectedBills, 0)
+    const totalPayroll = months.reduce((sum, month) => sum + month.projectedPayroll, 0)
+    const totalUnallocatedInflows = months.reduce((sum, month) => sum + month.unallocatedInflows, 0)
+    const totalUnallocatedOutflows = months.reduce((sum, month) => sum + month.unallocatedOutflows, 0)
+    const lowestProjectedBalance = Math.min(...months.map((month) => month.endingBalance), currentTotalBalance)
+    const firstNegativeMonth = getFirstNegativeMonth(months)
+    const finalProjectedBalance = months[months.length - 1]?.endingBalance ?? currentTotalBalance
+
+    const alerts: FinancialAlert[] = []
+    if (firstNegativeMonth) {
+      alerts.push({
+        type: 'FIRST_NEGATIVE_MONTH',
+        severity: 'critical',
+        message: 'Saldo total projetado fica negativo no periodo.',
+        amount: Math.abs(firstNegativeMonth.balance),
+      })
+    }
+    if (lowestProjectedBalance < 0) {
+      alerts.push({
+        type: 'LOWEST_PROJECTED_BALANCE',
+        severity: 'critical',
+        message: 'Menor saldo projetado no periodo e negativo.',
+        amount: Math.abs(lowestProjectedBalance),
+      })
+    }
+    for (const account of accountsForecast) {
+      if (account.firstNegativeMonth) {
+        alerts.push({
+          type: 'NEGATIVE_ACCOUNT_BALANCE',
+          severity: 'warning',
+          message: `A conta ${account.accountName} pode ficar negativa pela projecao atual.`,
+          amount: Math.abs(account.firstNegativeMonth.balance),
+          accountId: account.accountId,
+          accountName: account.accountName,
+        })
+      }
+    }
+    if (totalUnallocatedInflows > 0 || totalUnallocatedOutflows > 0) {
+      alerts.push({
+        type: 'UNALLOCATED_COMMITMENTS',
+        severity: 'warning',
+        message: 'Existem compromissos ou recebiveis sem conta definida no periodo.',
+        amount: totalUnallocatedInflows + totalUnallocatedOutflows,
+      })
+    }
+    if (overdueMovedToFirstMonth > 0) {
+      alerts.push({
+        type: 'OVERDUE_MOVED_TO_FIRST_MONTH',
+        severity: 'warning',
+        message: 'Valores vencidos antes do periodo foram considerados no primeiro mes projetado.',
+        amount: overdueMovedToFirstMonth,
+      })
+    }
+    if (totalPayroll > 0) {
+      alerts.push({
+        type: 'PROJECTED_PAYROLL',
+        severity: 'info',
+        message: 'Folha prevista/restante foi considerada como nao alocada.',
+        amount: totalPayroll,
+      })
+    }
+
+    return {
+      period: {
+        months: query.months,
+        startMonth,
+        startYear,
+        endMonth: lastMonthDate.getMonth() + 1,
+        endYear: lastMonthDate.getFullYear(),
+      },
+      summary: {
+        currentTotalBalance,
+        finalProjectedBalance,
+        lowestProjectedBalance,
+        firstNegativeMonth,
+        totalReceivables,
+        totalExpenses,
+        totalBills,
+        totalPayroll,
+        totalPayables: totalExpenses + totalBills + totalPayroll,
+        totalUnallocatedInflows,
+        totalUnallocatedOutflows,
+      },
+      months,
+      accounts: accountsForecast,
+      unallocated: {
+        totalInflows: totalUnallocatedInflows,
+        totalOutflows: totalUnallocatedOutflows,
+        months: unallocatedMonths,
+      },
+      alerts,
     }
   },
 

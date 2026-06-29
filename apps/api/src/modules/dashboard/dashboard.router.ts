@@ -8,10 +8,12 @@ import { asyncHandler } from '../../shared/utils/async-handler'
 import {
   dashboardQuerySchema,
   cashflowQuerySchema,
+  forecastQuerySchema,
   monthlyDashboardQuerySchema,
   payablesQuerySchema,
   type DashboardQuery,
   type CashflowQuery,
+  type ForecastQuery,
   type MonthlyDashboardQuery,
   type PayablesQuery,
 } from './dashboard.schemas'
@@ -76,6 +78,20 @@ dashboardRouter.get(
     const data = await DashboardService.cashflow(
       req.company!.id,
       req.query as unknown as CashflowQuery,
+    )
+    res.json({ success: true, data })
+  }),
+)
+
+// GET /api/v1/dashboard/forecast
+dashboardRouter.get(
+  '/forecast',
+  anyMember,
+  validate(forecastQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const data = await DashboardService.forecast(
+      req.company!.id,
+      req.query as unknown as ForecastQuery,
     )
     res.json({ success: true, data })
   }),
