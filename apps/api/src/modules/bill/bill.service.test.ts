@@ -70,6 +70,48 @@ function mockInstallmentCreates() {
   )
 }
 
+function billGroupWithBills(overrides: Record<string, unknown> = {}) {
+  return {
+    ...mockBillGroup({ totalAmount: 2000, installmentCount: 4 }),
+    supplier: { id: 'supplier-1', name: 'Casa Agricola' },
+    bills: [
+      bill({
+        id: 'bill-1',
+        billGroupId: 'group-1',
+        supplierId: 'supplier-1',
+        supplier: { id: 'supplier-1', name: 'Casa Agricola' },
+        amount: 500,
+        status: 'PAID',
+        paidAt: new Date('2026-07-10T00:00:00.000Z'),
+        dueDate: new Date('2026-07-10T00:00:00.000Z'),
+        installmentNumber: 1,
+        installmentCount: 4,
+      }),
+      bill({
+        id: 'bill-2',
+        billGroupId: 'group-1',
+        supplierId: 'supplier-1',
+        supplier: { id: 'supplier-1', name: 'Casa Agricola' },
+        amount: 500,
+        dueDate: new Date('2099-08-10T00:00:00.000Z'),
+        installmentNumber: 2,
+        installmentCount: 4,
+      }),
+      bill({
+        id: 'bill-3',
+        billGroupId: 'group-1',
+        supplierId: 'supplier-1',
+        supplier: { id: 'supplier-1', name: 'Casa Agricola' },
+        amount: 500,
+        dueDate: new Date('2099-09-10T00:00:00.000Z'),
+        installmentNumber: 3,
+        installmentCount: 4,
+      }),
+    ],
+    ...overrides,
+  }
+}
+
 describe('BillService balance rules', () => {
   beforeEach(() => {
     resetPrismaMock()
@@ -367,5 +409,126 @@ describe('BillService installment rules', () => {
 
     expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function))
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('BillService bill group read model', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+  })
+
+  it('lista apenas grupos da empresa com parcelas ativas e calcula resumo financeiro', async () => {
+    prismaMock.billGroup.findMany.mockResolvedValue([billGroupWithBills()])
+
+    const result = await BillService.listGroups(companyId, { page: 1, limit: 20 })
+
+    expect(prismaMock.billGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          companyId,
+          bills: { some: { companyId, deletedAt: null } },
+        }),
+      }),
+    )
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0]).toMatchObject({
+      totalAmount: 2000,
+      activeTotalAmount: 1500,
+      paidAmount: 500,
+      pendingAmount: 1000,
+      activeInstallments: 3,
+      paidInstallments: 1,
+      pendingInstallments: 2,
+      overdueInstallments: 0,
+      deletedInstallments: 1,
+      status: 'IN_PROGRESS',
+    })
+    expect(result.data[0].nextDueDate).toEqual(new Date('2099-08-10T00:00:00.000Z'))
+  })
+
+  it('filtra status derivado e remove grupos sem parcelas ativas', async () => {
+    prismaMock.billGroup.findMany.mockResolvedValue([
+      billGroupWithBills({ id: 'group-paid', bills: [bill({ status: 'PAID', amount: 100 })] }),
+      billGroupWithBills({ id: 'group-empty', bills: [] }),
+    ])
+
+    const result = await BillService.listGroups(companyId, { page: 1, limit: 20, status: 'PAID' })
+
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].id).toBe('group-paid')
+    expect(result.meta.total).toBe(1)
+  })
+
+  it('calcula status PENDING quando nenhuma parcela foi paga', async () => {
+    prismaMock.billGroup.findMany.mockResolvedValue([
+      billGroupWithBills({
+        bills: [
+          bill({ id: 'bill-1', amount: 100, dueDate: new Date('2099-01-10T00:00:00.000Z') }),
+          bill({ id: 'bill-2', amount: 100, dueDate: new Date('2099-02-10T00:00:00.000Z') }),
+        ],
+      }),
+    ])
+
+    const result = await BillService.listGroups(companyId, { page: 1, limit: 20 })
+
+    expect(result.data[0].status).toBe('PENDING')
+  })
+
+  it('calcula status OVERDUE por status salvo e por PENDING vencido', async () => {
+    prismaMock.billGroup.findMany.mockResolvedValue([
+      billGroupWithBills({
+        id: 'group-overdue-status',
+        bills: [bill({ id: 'bill-1', status: 'OVERDUE', dueDate: new Date('2099-01-10T00:00:00.000Z') })],
+      }),
+      billGroupWithBills({
+        id: 'group-overdue-date',
+        bills: [bill({ id: 'bill-2', status: 'PENDING', dueDate: new Date('2020-01-10T00:00:00.000Z') })],
+      }),
+    ])
+
+    const result = await BillService.listGroups(companyId, { page: 1, limit: 20 })
+
+    expect(result.data.map((group) => group.status)).toEqual(['OVERDUE', 'OVERDUE'])
+    expect(result.data.map((group) => group.overdueInstallments)).toEqual([1, 1])
+  })
+
+  it('detalha parcelas ativas ordenadas por numero da parcela e vencimento', async () => {
+    prismaMock.billGroup.findFirst.mockResolvedValue(
+      billGroupWithBills({
+        bills: [
+          bill({ id: 'bill-3', installmentNumber: 3, dueDate: new Date('2099-03-10T00:00:00.000Z') }),
+          bill({ id: 'bill-1', installmentNumber: 1, dueDate: new Date('2099-01-10T00:00:00.000Z') }),
+          bill({ id: 'bill-2', installmentNumber: 2, dueDate: new Date('2099-02-10T00:00:00.000Z') }),
+        ],
+      }),
+    )
+
+    const result = await BillService.findGroupById(companyId, 'group-1')
+
+    expect(prismaMock.billGroup.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'group-1',
+          companyId,
+          bills: { some: { companyId, deletedAt: null } },
+        },
+      }),
+    )
+    expect(result.installments.map((installment) => installment.id)).toEqual(['bill-1', 'bill-2', 'bill-3'])
+  })
+
+  it('nao retorna boletos avulsos e nao altera saldo nos endpoints de leitura', async () => {
+    prismaMock.billGroup.findMany.mockResolvedValue([billGroupWithBills()])
+
+    await BillService.listGroups(companyId, { page: 1, limit: 20 })
+
+    expect(prismaMock.bill.findMany).not.toHaveBeenCalled()
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+  })
+
+  it('retorna not found para grupo sem parcelas ativas', async () => {
+    prismaMock.billGroup.findFirst.mockResolvedValue(billGroupWithBills({ bills: [] }))
+
+    await expect(BillService.findGroupById(companyId, 'group-1')).rejects.toMatchObject({ statusCode: 404 })
   })
 })

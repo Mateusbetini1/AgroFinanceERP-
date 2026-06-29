@@ -74,9 +74,19 @@ export const listBillsSchema = paginationSchema.extend({
   dateTo: z.coerce.date().optional(),
 })
 
+export const billGroupStatusSchema = z.enum(['PENDING', 'IN_PROGRESS', 'PAID', 'OVERDUE'])
+
+export const listBillGroupsSchema = paginationSchema.extend({
+  search: z.string().trim().optional(),
+  supplierId: uuidSchema.optional(),
+  status: billGroupStatusSchema.optional(),
+})
+
 export const billParamsSchema = z.object({ id: uuidSchema })
 
 export type CreateBillDto = z.infer<typeof createBillSchema>
 export type CreateBillInstallmentsDto = z.infer<typeof createBillInstallmentsSchema>
 export type UpdateBillDto = z.infer<typeof updateBillSchema>
 export type ListBillsQuery = z.infer<typeof listBillsSchema>
+export type BillGroupStatus = z.infer<typeof billGroupStatusSchema>
+export type ListBillGroupsQuery = z.infer<typeof listBillGroupsSchema>

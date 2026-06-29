@@ -10,6 +10,8 @@ import type {
   CreateBillInstallmentsDto,
   UpdateBillDto,
   ListBillsQuery,
+  ListBillGroupsQuery,
+  BillGroupStatus,
 } from './bill.schemas'
 
 const BILL_SELECT = {
@@ -37,12 +39,34 @@ const BILL_GROUP_SELECT = {
   id: true,
   companyId: true,
   supplierId: true,
+  supplier: { select: { id: true, name: true } },
   description: true,
   totalAmount: true,
   installmentCount: true,
   createdAt: true,
   updatedAt: true,
 } as const
+
+const BILL_GROUP_INSTALLMENT_SELECT = {
+  id: true,
+  supplierId: true,
+  supplier: { select: { id: true, name: true } },
+  accountId: true,
+  account: { select: { id: true, name: true, type: true } },
+  description: true,
+  amount: true,
+  dueDate: true,
+  paidAt: true,
+  status: true,
+  installmentNumber: true,
+  installmentCount: true,
+} as const
+
+type BillGroupWithInstallments = Prisma.BillGroupGetPayload<{
+  select: typeof BILL_GROUP_SELECT & {
+    bills: { where: { deletedAt: null }; select: typeof BILL_GROUP_INSTALLMENT_SELECT }
+  }
+}>
 
 function distributeInstallmentAmounts(totalAmount: number, installmentCount: number): number[] {
   const totalCents = Math.round(totalAmount * 100)
@@ -72,6 +96,78 @@ function addMonthsClamped(date: Date, months: number): Date {
       date.getUTCMilliseconds(),
     ),
   )
+}
+
+function startOfToday(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function isUnpaidOverdue(installment: { status: string; dueDate: Date }): boolean {
+  return installment.status === 'OVERDUE' || (installment.status === 'PENDING' && installment.dueDate < startOfToday())
+}
+
+function summarizeBillGroup(group: BillGroupWithInstallments) {
+  const activeInstallments = group.bills.length
+  const paidInstallments = group.bills.filter((bill) => bill.status === 'PAID').length
+  const pendingInstallments = group.bills.filter((bill) => bill.status === 'PENDING').length
+  const overdueInstallments = group.bills.filter(isUnpaidOverdue).length
+  const unpaidInstallments = group.bills.filter((bill) => bill.status !== 'PAID')
+
+  const activeTotalAmount = group.bills.reduce((total, bill) => total + Number(bill.amount), 0)
+  const paidAmount = group.bills
+    .filter((bill) => bill.status === 'PAID')
+    .reduce((total, bill) => total + Number(bill.amount), 0)
+  const pendingAmount = group.bills
+    .filter((bill) => bill.status === 'PENDING' || bill.status === 'OVERDUE')
+    .reduce((total, bill) => total + Number(bill.amount), 0)
+
+  const nextDueDate =
+    unpaidInstallments.length > 0
+      ? unpaidInstallments
+          .map((bill) => bill.dueDate)
+          .sort((a, b) => a.getTime() - b.getTime())[0]
+      : null
+
+  let status: BillGroupStatus = 'PENDING'
+  if (overdueInstallments > 0) {
+    status = 'OVERDUE'
+  } else if (activeInstallments > 0 && paidInstallments === activeInstallments) {
+    status = 'PAID'
+  } else if (paidInstallments > 0 && unpaidInstallments.length > 0) {
+    status = 'IN_PROGRESS'
+  }
+
+  return {
+    id: group.id,
+    description: group.description,
+    supplier: group.supplier,
+    totalAmount: Number(group.totalAmount),
+    activeTotalAmount,
+    paidAmount,
+    pendingAmount,
+    installmentCount: group.installmentCount,
+    activeInstallments,
+    paidInstallments,
+    pendingInstallments,
+    overdueInstallments,
+    deletedInstallments: Math.max(group.installmentCount - activeInstallments, 0),
+    nextDueDate,
+    status,
+    createdAt: group.createdAt,
+    updatedAt: group.updatedAt,
+  }
+}
+
+function sortInstallments(
+  installments: BillGroupWithInstallments['bills'],
+): BillGroupWithInstallments['bills'] {
+  return [...installments].sort((a, b) => {
+    const aNumber = a.installmentNumber ?? Number.MAX_SAFE_INTEGER
+    const bNumber = b.installmentNumber ?? Number.MAX_SAFE_INTEGER
+    if (aNumber !== bNumber) return aNumber - bNumber
+    return a.dueDate.getTime() - b.dueDate.getTime()
+  })
 }
 
 async function validateSupplierId(companyId: string, supplierId: string): Promise<void> {
@@ -195,6 +291,65 @@ export const BillService = {
     ])
 
     return buildPaginatedResponse(data, total, { page, limit })
+  },
+
+  async listGroups(companyId: string, query: ListBillGroupsQuery) {
+    const { page, limit, search, supplierId, status } = query
+
+    const groups = await prisma.billGroup.findMany({
+      where: {
+        companyId,
+        ...(supplierId ? { supplierId } : {}),
+        ...(search
+          ? { description: { contains: search, mode: 'insensitive' as const } }
+          : {}),
+        bills: { some: { companyId, deletedAt: null } },
+      },
+      select: {
+        ...BILL_GROUP_SELECT,
+        bills: {
+          where: { deletedAt: null },
+          select: BILL_GROUP_INSTALLMENT_SELECT,
+          orderBy: [{ installmentNumber: 'asc' }, { dueDate: 'asc' }],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const summaries = groups
+      .map(summarizeBillGroup)
+      .filter((group) => group.activeInstallments > 0)
+      .filter((group) => !status || group.status === status)
+
+    const start = (page - 1) * limit
+    const data = summaries.slice(start, start + limit)
+
+    return buildPaginatedResponse(data, summaries.length, { page, limit })
+  },
+
+  async findGroupById(companyId: string, id: string) {
+    const group = await prisma.billGroup.findFirst({
+      where: {
+        id,
+        companyId,
+        bills: { some: { companyId, deletedAt: null } },
+      },
+      select: {
+        ...BILL_GROUP_SELECT,
+        bills: {
+          where: { deletedAt: null },
+          select: BILL_GROUP_INSTALLMENT_SELECT,
+          orderBy: [{ installmentNumber: 'asc' }, { dueDate: 'asc' }],
+        },
+      },
+    })
+
+    if (!group || group.bills.length === 0) throw AppError.notFound('Grupo de boletos')
+
+    return {
+      summary: summarizeBillGroup(group),
+      installments: sortInstallments(group.bills),
+    }
   },
 
   async findById(companyId: string, id: string) {

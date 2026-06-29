@@ -10,8 +10,10 @@ import {
   createBillInstallmentsSchema,
   updateBillSchema,
   listBillsSchema,
+  listBillGroupsSchema,
   billParamsSchema,
   type ListBillsQuery,
+  type ListBillGroupsQuery,
 } from './bill.schemas'
 
 export const billRouter = Router()
@@ -52,6 +54,31 @@ billRouter.post(
   asyncHandler(async (req, res) => {
     const result = await BillService.createInstallments(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: result })
+  }),
+)
+
+// GET /api/v1/bills/groups
+billRouter.get(
+  '/groups',
+  anyMember,
+  validate(listBillGroupsSchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const result = await BillService.listGroups(
+      req.company!.id,
+      req.query as unknown as ListBillGroupsQuery,
+    )
+    res.json({ success: true, ...result })
+  }),
+)
+
+// GET /api/v1/bills/groups/:id
+billRouter.get(
+  '/groups/:id',
+  anyMember,
+  validate(billParamsSchema, 'params'),
+  asyncHandler(async (req, res) => {
+    const group = await BillService.findGroupById(req.company!.id, req.params.id)
+    res.json({ success: true, data: group })
   }),
 )
 
