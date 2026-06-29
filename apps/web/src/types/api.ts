@@ -269,10 +269,11 @@ export interface FarmLocation {
   id: string
   name: string
   type: FarmLocationType
-  area: number | null
+  area: number | string | null
   notes: string | null
   active: boolean
   createdAt: string
+  updatedAt?: string
 }
 
 // ── EmployeePayment ───────────────────────────────────────────────────────────

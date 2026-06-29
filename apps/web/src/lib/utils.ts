@@ -98,6 +98,18 @@ export function formatUnit(unit: string | null | undefined): string {
   return labels[unit] ?? unit
 }
 
+export function formatFarmLocationType(type: string | null | undefined): string {
+  if (!type) return '-'
+
+  const labels: Record<string, string> = {
+    GREENHOUSE: 'Estufa',
+    PLOT: 'Talhao',
+    FIELD: 'Campo/Area',
+  }
+
+  return labels[type] ?? type
+}
+
 export function formatPaymentType(type: string | null | undefined): string {
   if (!type) return '-'
 
