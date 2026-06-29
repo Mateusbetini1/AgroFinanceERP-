@@ -27,13 +27,13 @@ const enabledItems = [
   { href: '/revenues', label: 'Receitas', icon: BarChart3 },
   { href: '/expenses', label: 'Despesas', icon: Receipt },
   { href: '/bills', label: 'Boletos', icon: FileText },
+  { href: '/safras', label: 'Safras', icon: Sprout },
   { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
   { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
   { href: '/employees', label: 'Funcionários', icon: Users },
 ]
 
 const upcomingItems = [
-  { label: 'Safras', icon: Sprout },
   { label: 'Relatórios', icon: FileText },
 ]
 

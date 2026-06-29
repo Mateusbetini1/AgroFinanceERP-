@@ -248,7 +248,7 @@ export interface Safra {
   id: string
   name: string
   productId?: string
-  product: { id?: string; name: string; active?: boolean }
+  product: { id?: string; name: string; unit?: string; active?: boolean }
   farmLocationId?: string | null
   farmLocation: { id?: string; name: string; type?: FarmLocationType; active?: boolean } | null
   startDate: string

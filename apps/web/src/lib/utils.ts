@@ -58,6 +58,19 @@ export function formatStatusLabel(status: string | null | undefined): string {
   return labels[status] ?? status
 }
 
+export function formatSafraStatus(status: string | null | undefined): string {
+  if (!status) return '-'
+
+  const labels: Record<string, string> = {
+    PLANNED: 'Planejada',
+    ACTIVE: 'Ativa',
+    COMPLETED: 'Concluida',
+    CANCELLED: 'Cancelada',
+  }
+
+  return labels[status] ?? status
+}
+
 export function formatAccountType(type: string | null | undefined): string {
   if (!type) return '-'
   return type === 'CASH' ? 'Caixa' : type === 'BANK' ? 'Banco' : type
