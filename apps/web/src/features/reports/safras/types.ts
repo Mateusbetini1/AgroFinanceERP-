@@ -15,6 +15,12 @@ export interface SafraReportSummary {
   paidExpenses: number
   pendingExpenses: number
   totalExpenses: number
+  paidBills: number
+  pendingBills: number
+  totalBills: number
+  paidCosts: number
+  pendingCosts: number
+  totalCosts: number
   realizedResult: number
   projectedResult: number
   costPerEstimatedUnit: number | null
@@ -36,8 +42,10 @@ export interface SafraReportFilters {
 }
 
 export interface SafraExpenseByCategory {
-  categoryId: string
+  categoryId: string | null
   categoryName: string
+  expenseAmount: number
+  billAmount: number
   paidAmount: number
   pendingAmount: number
   totalAmount: number
@@ -54,16 +62,18 @@ export interface SafraRevenueByProductClient {
 
 export interface SafraReportMovement {
   id: string
-  type: 'REVENUE' | 'EXPENSE'
+  type: 'REVENUE' | 'EXPENSE' | 'BILL'
   date: string
   description: string
   status: string
   amount: number
+  sourceLabel?: string
 }
 
 export interface SafraReportDetail {
   summary: SafraReportSummary
   expensesByCategory: SafraExpenseByCategory[]
+  costsByCategory?: SafraExpenseByCategory[]
   revenuesByProductClient: SafraRevenueByProductClient[]
   recentMovements: SafraReportMovement[]
 }

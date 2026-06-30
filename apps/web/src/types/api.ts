@@ -188,13 +188,17 @@ export type BillStatus = 'PENDING' | 'PAID' | 'OVERDUE'
 export interface Bill {
   id: string
   billGroupId: string | null
+  categoryId: string | null
   supplierId: string | null
   accountId: string | null
+  safraId: string | null
   description: string
   dueDate: string
   paidAt: string | null
+  category: { id?: string; name: string; type?: CategoryType } | null
   supplier: { id?: string; name: string } | null
   account: { id?: string; name: string; type?: AccountType } | null
+  safra: { id?: string; name: string } | null
   amount: number | string
   status: BillStatus
   installmentNumber: number | null

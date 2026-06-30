@@ -24,7 +24,7 @@ describe('ReportService.safras', () => {
     resetPrismaMock()
   })
 
-  it('calcula realizado, previsto e metricas por unidade usando apenas receitas e despesas da safra', async () => {
+  it('calcula realizado, previsto e metricas por unidade usando receitas, despesas e boletos da safra', async () => {
     prismaMock.safra.findMany.mockResolvedValue([safra()])
     prismaMock.revenue.findMany.mockResolvedValue([
       { safraId: 'safra-1', status: 'RECEIVED', totalAmount: 1000 },
@@ -35,6 +35,12 @@ describe('ReportService.safras', () => {
       { safraId: 'safra-1', status: 'PAID', amount: 300 },
       { safraId: 'safra-1', status: 'PENDING', amount: 200 },
       { safraId: 'safra-1', status: 'OVERDUE', amount: 100 },
+      { safraId: null, status: 'PAID', amount: 9999 },
+    ])
+    prismaMock.bill.findMany.mockResolvedValue([
+      { safraId: 'safra-1', status: 'PAID', amount: 400 },
+      { safraId: 'safra-1', status: 'PENDING', amount: 300 },
+      { safraId: 'safra-1', status: 'OVERDUE', amount: 200 },
       { safraId: null, status: 'PAID', amount: 9999 },
     ])
 
@@ -51,17 +57,22 @@ describe('ReportService.safras', () => {
         paidExpenses: 300,
         pendingExpenses: 300,
         totalExpenses: 600,
-        realizedResult: 700,
-        projectedResult: 900,
-        costPerEstimatedUnit: 6,
+        paidBills: 400,
+        pendingBills: 500,
+        totalBills: 900,
+        paidCosts: 700,
+        pendingCosts: 800,
+        totalCosts: 1500,
+        realizedResult: 300,
+        projectedResult: 0,
+        costPerEstimatedUnit: 15,
         revenuePerEstimatedUnit: 15,
-        resultPerEstimatedUnit: 9,
+        resultPerEstimatedUnit: 0,
         revenueTotal: 1500,
         expenseTotal: 600,
-        result: 900,
+        result: 0,
       }),
     )
-    expect(prismaMock.bill.findMany).not.toHaveBeenCalled()
     expect(prismaMock.employeePayment.findMany).not.toHaveBeenCalled()
   })
 
@@ -72,6 +83,7 @@ describe('ReportService.safras', () => {
     ])
     prismaMock.revenue.findMany.mockResolvedValue([])
     prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.bill.findMany.mockResolvedValue([])
 
     const result = await ReportService.safras(companyId, {})
 
@@ -125,6 +137,7 @@ describe('ReportService.safras', () => {
     )
     expect(prismaMock.revenue.findMany).not.toHaveBeenCalled()
     expect(prismaMock.expense.findMany).not.toHaveBeenCalled()
+    expect(prismaMock.bill.findMany).not.toHaveBeenCalled()
   })
 })
 
@@ -189,6 +202,22 @@ describe('ReportService.safraDetail', () => {
           category: { id: 'category-1', name: 'Insumos' },
         },
       ])
+    prismaMock.bill.findMany
+      .mockResolvedValueOnce([
+        { safraId: 'safra-1', status: 'PAID', amount: 200 },
+        { safraId: 'safra-1', status: 'PENDING', amount: 150 },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'bill-1',
+          dueDate: new Date('2026-01-16T00:00:00.000Z'),
+          paidAt: null,
+          description: 'Parcela adubo',
+          amount: 150,
+          status: 'PENDING',
+          category: { id: 'category-1', name: 'Insumos' },
+        },
+      ])
 
     const result = await ReportService.safraDetail(companyId, 'safra-1')
 
@@ -197,9 +226,11 @@ describe('ReportService.safraDetail', () => {
       {
         categoryId: 'category-1',
         categoryName: 'Insumos',
+        expenseAmount: 400,
+        billAmount: 150,
         paidAmount: 300,
-        pendingAmount: 100,
-        totalAmount: 400,
+        pendingAmount: 250,
+        totalAmount: 550,
       },
     ])
     expect(result.revenuesByProductClient).toEqual([
@@ -213,6 +244,7 @@ describe('ReportService.safraDetail', () => {
       },
     ])
     expect(result.recentMovements.map((item) => item.id)).toEqual([
+      'bill-1',
       'expense-2',
       'expense-1',
       'revenue-1',

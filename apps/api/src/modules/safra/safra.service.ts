@@ -42,14 +42,16 @@ async function validateFarmLocationId(companyId: string, farmLocationId: string)
 }
 
 async function checkDependencies(companyId: string, id: string): Promise<void> {
-  const [revenueCount, expenseCount] = await Promise.all([
+  const [revenueCount, expenseCount, billCount] = await Promise.all([
     prisma.revenue.count({ where: { companyId, safraId: id, deletedAt: null } }),
     prisma.expense.count({ where: { companyId, safraId: id, deletedAt: null } }),
+    prisma.bill.count({ where: { companyId, safraId: id, deletedAt: null } }),
   ])
 
   const deps: string[] = []
   if (revenueCount > 0) deps.push(revenueCount + ' receita(s)')
   if (expenseCount > 0) deps.push(expenseCount + ' despesa(s)')
+  if (billCount > 0) deps.push(billCount + ' boleto(s)')
 
   if (deps.length > 0) {
     throw AppError.conflict(

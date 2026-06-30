@@ -28,6 +28,8 @@ export function BillGroupSummaryCards({ summary }: { summary: BillGroupSummary }
           <Metric label="Parcelas pagas" value={String(summary.paidInstallments)} />
           <Metric label="Parcelas vencidas" value={String(summary.overdueInstallments)} />
           <Metric label="Proximo vencimento" value={formatDate(summary.nextDueDate)} />
+          <Metric label="Categoria" value={summary.categoryMixed ? 'Misto' : summary.category?.name ?? '-'} />
+          <Metric label="Safra" value={summary.safraMixed ? 'Misto' : summary.safra?.name ?? '-'} />
         </div>
         {summary.deletedInstallments > 0 && (
           <p className="mt-4 text-xs text-muted-foreground">

@@ -26,7 +26,17 @@ export function BillsTable({
   onDelete: (bill: Bill) => void
 }) {
   const columns: DataTableColumn<Bill>[] = [
-    { header: 'Descrição', cell: (bill) => <span className="font-medium">{bill.description}</span> },
+    {
+      header: 'Descricao',
+      cell: (bill) => (
+        <div>
+          <p className="font-medium">{bill.description}</p>
+          <p className="text-xs text-muted-foreground">
+            {bill.category?.name ?? 'Sem categoria'} | {bill.safra?.name ?? 'Sem safra'}
+          </p>
+        </div>
+      ),
+    },
     { header: 'Fornecedor', cell: (bill) => bill.supplier?.name ?? '-' },
     { header: 'Conta', cell: (bill) => bill.account?.name ?? '-' },
     { header: 'Valor', cell: (bill) => formatCurrency(bill.amount), className: 'text-right' },

@@ -28,7 +28,9 @@ export const expenseReportSchema = baseReportSchema.extend({
 
 export const billReportSchema = baseReportSchema.extend({
   status: z.enum(['PENDING', 'PAID', 'OVERDUE']).optional(),
+  categoryId: uuidSchema.optional(),
   supplierId: uuidSchema.optional(),
+  safraId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
 })
 

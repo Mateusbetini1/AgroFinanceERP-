@@ -7,8 +7,10 @@ import { InlineAlert } from '@/components/feedback/inline-alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { listAccounts } from '@/features/accounts/api'
+import { listCategories } from '@/features/categories/api'
 import { createRecurringBills } from '@/features/bills/api'
 import { BillRecurringForm } from '@/features/bills/components/bill-recurring-form'
+import { listSafras } from '@/features/safras/api'
 import { listSuppliers } from '@/features/suppliers/api'
 import { cn, formatDate, getApiErrorMessage } from '@/lib/utils'
 
@@ -16,6 +18,8 @@ export default function RecurringBillsPage() {
   const queryClient = useQueryClient()
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
+  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
+  const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
 
   const mutation = useMutation({
     mutationFn: createRecurringBills,
@@ -28,8 +32,10 @@ export default function RecurringBillsPage() {
 
   const suppliers = suppliersQuery.data?.data ?? []
   const accounts = accountsQuery.data?.data ?? []
-  const isLoading = suppliersQuery.isLoading || accountsQuery.isLoading
-  const isError = suppliersQuery.isError || accountsQuery.isError
+  const categories = categoriesQuery.data?.data ?? []
+  const safras = safrasQuery.data?.data ?? []
+  const isLoading = suppliersQuery.isLoading || accountsQuery.isLoading || categoriesQuery.isLoading || safrasQuery.isLoading
+  const isError = suppliersQuery.isError || accountsQuery.isError || categoriesQuery.isError || safrasQuery.isError
 
   return (
     <div className="space-y-6">
@@ -74,6 +80,8 @@ export default function RecurringBillsPage() {
             <BillRecurringForm
               suppliers={suppliers}
               accounts={accounts}
+              categories={categories}
+              safras={safras}
               isSubmitting={mutation.isPending}
               onSubmit={(payload) => mutation.mutate(payload)}
             />

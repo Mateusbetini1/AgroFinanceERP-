@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { dateInputToIso, formatCurrency, formatDate, toDateInputValue } from '@/lib/utils'
-import type { Account, Bill, Supplier } from '@/types/api'
+import type { Account, Bill, Category, Safra, Supplier } from '@/types/api'
 import type { BillInstallmentsPayload, BillPayload } from '../api'
 
 type EditableBillStatus = 'PENDING' | 'PAID'
@@ -22,6 +22,8 @@ interface BillFormProps {
   initialValue?: Bill | null
   suppliers: Supplier[]
   accounts: Account[]
+  categories: Category[]
+  safras: Safra[]
   isSubmitting?: boolean
   onSubmit: (payload: BillFormSubmit) => void
   onCancel: () => void
@@ -52,10 +54,12 @@ function addMonthsClamped(date: Date, months: number): Date {
   return new Date(targetYear, targetMonth, targetDay, 12)
 }
 
-export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSubmit, onCancel }: BillFormProps) {
+export function BillForm({ initialValue, suppliers, accounts, categories, safras, isSubmitting, onSubmit, onCancel }: BillFormProps) {
   const [mode, setMode] = useState<CreateMode>('single')
+  const [categoryId, setCategoryId] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [safraId, setSafraId] = useState('')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -68,8 +72,10 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
 
   useEffect(() => {
     setMode('single')
+    setCategoryId(initialValue?.categoryId ?? '')
     setSupplierId(initialValue?.supplierId ?? '')
     setAccountId(initialValue?.accountId ?? '')
+    setSafraId(initialValue?.safraId ?? '')
     setDescription(initialValue?.description ?? '')
     setAmount(initialValue ? String(initialValue.amount) : '')
     setDueDate(toDateInputValue(initialValue?.dueDate) || toDateInputValue(new Date()))
@@ -146,8 +152,10 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
       onSubmit({
         mode: 'installments',
         payload: {
+          categoryId: categoryId || undefined,
           supplierId: supplierId || undefined,
           accountId: accountId || undefined,
+          safraId: safraId || undefined,
           description: description.trim(),
           totalAmount: parsedAmount,
           installmentCount: parsedInstallmentCount,
@@ -175,8 +183,10 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
     onSubmit({
       mode: 'single',
       payload: {
+        categoryId: categoryId || null,
         supplierId: supplierId || null,
         accountId: accountId || null,
+        safraId: safraId || null,
         description: description.trim(),
         amount: parsedAmount,
         dueDate: dateInputToIso(dueDate)!,
@@ -220,6 +230,20 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
+          <Label htmlFor="bill-category">Categoria</Label>
+          <Select id="bill-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">Sem categoria</option>
+            {categories
+              .filter((category) => category.active && (category.type === 'EXPENSE' || category.type === 'BOTH'))
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="bill-supplier">Fornecedor</Label>
           <Select id="bill-supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
             <option value="">Sem fornecedor</option>
@@ -230,6 +254,9 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
             ))}
           </Select>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
 
         <div className="space-y-2">
           <Label htmlFor="bill-account">{isInstallmentsMode ? 'Conta prevista' : `Conta ${status === 'PAID' ? '*' : ''}`}</Label>
@@ -245,6 +272,20 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
                 {account.name} ({formatCurrency(account.currentBalance)})
               </option>
             ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bill-safra">Safra/Ciclo produtivo</Label>
+          <Select id="bill-safra" value={safraId} onChange={(event) => setSafraId(event.target.value)}>
+            <option value="">Sem safra</option>
+            {safras
+              .filter((safra) => safra.active)
+              .map((safra) => (
+                <option key={safra.id} value={safra.id}>
+                  {safra.name}
+                </option>
+              ))}
           </Select>
         </div>
       </div>
@@ -374,6 +415,10 @@ export function BillForm({ initialValue, suppliers, accounts, isSubmitting, onSu
           Alterações de valor, status ou conta ajustam automaticamente o saldo desta parcela.
         </div>
       )}
+
+      <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+        Use Boletos para compromissos a pagar. Use Despesas para despesas lancadas diretamente. Evite lancar o mesmo gasto nos dois lugares.
+      </div>
 
       {error && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">

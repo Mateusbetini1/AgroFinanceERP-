@@ -59,8 +59,8 @@ export default function SafraReportsPage() {
       </div>
 
       <InlineAlert tone="success">
-        Este relatorio considera receitas e despesas vinculadas diretamente a safra. Boletos, folha e parcelamentos sem
-        vinculo com safra nao entram nesta versao.
+        Este relatorio considera receitas, despesas e boletos vinculados diretamente a safra. Folha de funcionarios e
+        movimentacoes sem vinculo com safra nao entram nesta versao.
       </InlineAlert>
 
       <Card>

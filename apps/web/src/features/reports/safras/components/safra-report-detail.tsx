@@ -11,6 +11,8 @@ import type {
 export function SafraReportDetail({ detail }: { detail: SafraReportDetailType }) {
   const expenseColumns: DataTableColumn<SafraExpenseByCategory>[] = [
     { header: 'Categoria', cell: (item) => item.categoryName },
+    { header: 'Despesas', cell: (item) => formatCurrency(item.expenseAmount) },
+    { header: 'Boletos', cell: (item) => formatCurrency(item.billAmount) },
     { header: 'Pago', cell: (item) => formatCurrency(item.paidAmount) },
     { header: 'Pendente', cell: (item) => formatCurrency(item.pendingAmount) },
     { header: 'Total', cell: (item) => formatCurrency(item.totalAmount) },
@@ -26,7 +28,7 @@ export function SafraReportDetail({ detail }: { detail: SafraReportDetailType })
 
   const movementColumns: DataTableColumn<SafraReportMovement>[] = [
     { header: 'Data', cell: (item) => formatDate(item.date) },
-    { header: 'Tipo', cell: (item) => (item.type === 'REVENUE' ? 'Receita' : 'Despesa') },
+    { header: 'Tipo', cell: (item) => item.sourceLabel ?? (item.type === 'REVENUE' ? 'Receita' : item.type === 'BILL' ? 'Boleto' : 'Despesa') },
     { header: 'Descricao', cell: (item) => item.description },
     { header: 'Status', cell: (item) => item.status },
     { header: 'Valor', cell: (item) => formatCurrency(item.amount) },
@@ -64,6 +66,14 @@ export function SafraReportDetail({ detail }: { detail: SafraReportDetailType })
             <p className="font-medium">{formatCurrency(detail.summary.totalExpenses)}</p>
           </div>
           <div>
+            <p className="text-muted-foreground">Boletos/contas</p>
+            <p className="font-medium">{formatCurrency(detail.summary.totalBills)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Custos totais</p>
+            <p className="font-medium">{formatCurrency(detail.summary.totalCosts)}</p>
+          </div>
+          <div>
             <p className="text-muted-foreground">Resultado previsto</p>
             <p className="font-medium">{formatCurrency(detail.summary.projectedResult)}</p>
           </div>
@@ -77,13 +87,13 @@ export function SafraReportDetail({ detail }: { detail: SafraReportDetailType })
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Despesas por categoria</CardTitle>
+            <CardTitle className="text-base">Custos por categoria</CardTitle>
           </CardHeader>
           <CardContent>
-            {detail.expensesByCategory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma despesa vinculada.</p>
+            {(detail.costsByCategory ?? detail.expensesByCategory).length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum custo vinculado.</p>
             ) : (
-              <DataTable columns={expenseColumns} data={detail.expensesByCategory} getRowKey={(item) => item.categoryId} />
+              <DataTable columns={expenseColumns} data={detail.costsByCategory ?? detail.expensesByCategory} getRowKey={(item) => item.categoryId ?? 'uncategorized'} />
             )}
           </CardContent>
         </Card>

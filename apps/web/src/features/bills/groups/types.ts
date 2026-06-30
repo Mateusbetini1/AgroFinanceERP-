@@ -1,4 +1,4 @@
-import type { AccountType, BillStatus } from '@/types/api'
+import type { AccountType, BillStatus, CategoryType } from '@/types/api'
 
 export type BillGroupStatus = 'PENDING' | 'IN_PROGRESS' | 'PAID' | 'OVERDUE'
 
@@ -6,6 +6,10 @@ export interface BillGroupSummary {
   id: string
   description: string
   supplier: { id: string; name: string } | null
+  category: { id: string; name: string; type?: CategoryType } | null
+  categoryMixed: boolean
+  safra: { id: string; name: string } | null
+  safraMixed: boolean
   totalAmount: number | string
   activeTotalAmount: number | string
   paidAmount: number | string
@@ -31,8 +35,10 @@ export interface BillGroupInstallment {
   status: BillStatus
   installmentNumber: number | null
   installmentCount: number | null
+  category: { id: string; name: string; type?: CategoryType } | null
   supplier: { id: string; name: string } | null
   account: { id: string; name: string; type?: AccountType } | null
+  safra: { id: string; name: string } | null
 }
 
 export interface BillGroupDetail {

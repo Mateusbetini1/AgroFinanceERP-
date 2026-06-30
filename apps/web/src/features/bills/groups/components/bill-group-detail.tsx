@@ -22,6 +22,8 @@ export function BillGroupDetailPanel({ detail }: { detail: BillGroupDetail }) {
           : '-',
     },
     { header: 'Descricao', cell: (installment) => installment.description },
+    { header: 'Categoria', cell: (installment) => installment.category?.name ?? '-' },
+    { header: 'Safra', cell: (installment) => installment.safra?.name ?? '-' },
     { header: 'Fornecedor', cell: (installment) => installment.supplier?.name ?? '-' },
     { header: 'Conta', cell: (installment) => installment.account?.name ?? '-' },
     { header: 'Valor', cell: (installment) => formatCurrency(installment.amount), className: 'text-right' },

@@ -35,16 +35,18 @@ async function checkNameConflict(
   }
 }
 
-// Bloqueia soft delete se houver produtos ou despesas ativos vinculados.
+// Bloqueia soft delete se houver produtos, despesas ou boletos ativos vinculados.
 async function checkDependencies(companyId: string, id: string): Promise<void> {
-  const [productCount, expenseCount] = await Promise.all([
+  const [productCount, expenseCount, billCount] = await Promise.all([
     prisma.product.count({ where: { companyId, categoryId: id, deletedAt: null } }),
     prisma.expense.count({ where: { companyId, categoryId: id, deletedAt: null } }),
+    prisma.bill.count({ where: { companyId, categoryId: id, deletedAt: null } }),
   ])
 
   const deps: string[] = []
   if (productCount > 0) deps.push(`${productCount} produto(s)`)
   if (expenseCount > 0) deps.push(`${expenseCount} despesa(s)`)
+  if (billCount > 0) deps.push(`${billCount} boleto(s)`)
 
   if (deps.length > 0) {
     throw AppError.conflict(

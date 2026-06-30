@@ -318,6 +318,7 @@ model Category {
   company   Company    @relation(fields: [companyId], references: [id])
   expenses  Expense[]
   products  Product[]
+  bills     Bill[]
 
   // Partial unique index manual em migration:
   // CREATE UNIQUE INDEX categories_company_id_name_active_unique ON categories (company_id, name) WHERE deleted_at IS NULL;
@@ -483,6 +484,7 @@ model Safra {
   product      Product       @relation(fields: [productId], references: [id])
   revenues     Revenue[]
   expenses     Expense[]
+  bills        Bill[]
 
   @@index([companyId])
   @@index([companyId, status])
@@ -672,8 +674,10 @@ model Bill {
   id                String     @id @default(uuid())
   companyId         String     @map("company_id")
   billGroupId       String?    @map("bill_group_id")
+  categoryId        String?    @map("category_id")
   supplierId        String?    @map("supplier_id")
   accountId         String?    @map("account_id")
+  safraId           String?    @map("safra_id")
   description       String
   amount            Decimal    @db.Decimal(15, 2)
   dueDate           DateTime   @map("due_date")
@@ -688,14 +692,18 @@ model Bill {
 
   company   Company    @relation(fields: [companyId], references: [id])
   billGroup BillGroup? @relation(fields: [billGroupId], references: [id])
+  category  Category?  @relation(fields: [categoryId], references: [id])
   supplier  Supplier?  @relation(fields: [supplierId], references: [id])
   account   Account?   @relation(fields: [accountId], references: [id])
+  safra     Safra?     @relation(fields: [safraId], references: [id])
   invoices  Invoice[]
 
   @@index([companyId])
   @@index([companyId, status])
   @@index([companyId, dueDate])
   @@index([companyId, status, dueDate]) // query: boletos pendentes vencendo em N dias
+  @@index([companyId, categoryId])
+  @@index([companyId, safraId])
   @@index([billGroupId])
   @@map("bills")
 }

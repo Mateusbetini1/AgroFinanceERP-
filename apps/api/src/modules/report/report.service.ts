@@ -198,7 +198,7 @@ export const ReportService = {
   },
 
   async bills(companyId: string, query: BillReportQuery) {
-    const { dateFrom, dateTo, status, supplierId, accountId, basis } = query
+    const { dateFrom, dateTo, status, categoryId, supplierId, safraId, accountId, basis } = query
 
     if (basis === 'cash' && status && status !== 'PAID') {
       return emptyReport(query.format)
@@ -210,7 +210,9 @@ export const ReportService = {
         companyId,
         deletedAt: null,
         ...(basis === 'cash' ? { status: 'PAID' } : status ? { status } : {}),
+        ...(categoryId ? { categoryId } : {}),
         ...(supplierId ? { supplierId } : {}),
+        ...(safraId ? { safraId } : {}),
         ...(accountId ? { accountId } : {}),
         ...(basis === 'cash'
           ? cashDateFallbackWhere('paidAt', 'dueDate', bounds)
@@ -223,8 +225,10 @@ export const ReportService = {
         dueDate: true,
         paidAt: true,
         description: true,
+        category: { select: { id: true, name: true } },
         supplier: { select: { id: true, name: true } },
         account: { select: { id: true, name: true } },
+        safra: { select: { id: true, name: true } },
         amount: true,
         status: true,
         installmentNumber: true,
@@ -235,18 +239,20 @@ export const ReportService = {
 
     if (query.format === 'csv') {
       const headers = [
-        'ID', 'Descricao', 'Fornecedor', 'Valor', 'Vencimento', 'Status',
-        'Pago Em', 'Conta', 'Parcela', 'Total Parcelas',
+        'ID', 'Descricao', 'Categoria', 'Fornecedor', 'Valor', 'Vencimento', 'Status',
+        'Pago Em', 'Conta', 'Safra', 'Parcela', 'Total Parcelas',
       ]
       const rows = data.map((b) => [
         b.id,
         b.description,
+        b.category?.name ?? '',
         b.supplier?.name ?? '',
         formatDecimal(b.amount),
         formatDate(b.dueDate),
         b.status,
         formatDate(b.paidAt),
         b.account?.name ?? '',
+        b.safra?.name ?? '',
         b.installmentNumber !== null ? String(b.installmentNumber) : '',
         b.installmentCount !== null ? String(b.installmentCount) : '',
       ])
@@ -285,12 +291,16 @@ export const ReportService = {
     const safraIds = safras.map((safra) => safra.id)
     if (safraIds.length === 0) return { data: [], count: 0 }
 
-    const [revenues, expenses] = await Promise.all([
+    const [revenues, expenses, bills] = await Promise.all([
       prisma.revenue.findMany({
         where: { companyId, deletedAt: null, safraId: { in: safraIds } },
         select: { safraId: true, status: true, totalAmount: true },
       }),
       prisma.expense.findMany({
+        where: { companyId, deletedAt: null, safraId: { in: safraIds } },
+        select: { safraId: true, status: true, amount: true },
+      }),
+      prisma.bill.findMany({
         where: { companyId, deletedAt: null, safraId: { in: safraIds } },
         select: { safraId: true, status: true, amount: true },
       }),
@@ -300,6 +310,8 @@ export const ReportService = {
     const pendingRevenueBySafra = new Map<string, number>()
     const paidExpensesBySafra = new Map<string, number>()
     const pendingExpensesBySafra = new Map<string, number>()
+    const paidBillsBySafra = new Map<string, number>()
+    const pendingBillsBySafra = new Map<string, number>()
 
     for (const revenue of revenues) {
       if (!revenue.safraId) continue
@@ -315,6 +327,14 @@ export const ReportService = {
       }
     }
 
+    for (const bill of bills) {
+      if (!bill.safraId) continue
+      if (bill.status === 'PAID') addToBucket(paidBillsBySafra, bill.safraId, bill.amount)
+      if (bill.status === 'PENDING' || bill.status === 'OVERDUE') {
+        addToBucket(pendingBillsBySafra, bill.safraId, bill.amount)
+      }
+    }
+
     const data = safras.map((safra) => {
       const receivedRevenue = receivedRevenueBySafra.get(safra.id) ?? 0
       const pendingRevenue = pendingRevenueBySafra.get(safra.id) ?? 0
@@ -322,8 +342,14 @@ export const ReportService = {
       const paidExpenses = paidExpensesBySafra.get(safra.id) ?? 0
       const pendingExpenses = pendingExpensesBySafra.get(safra.id) ?? 0
       const totalExpenses = paidExpenses + pendingExpenses
-      const realizedResult = receivedRevenue - paidExpenses
-      const projectedResult = totalRevenue - totalExpenses
+      const paidBills = paidBillsBySafra.get(safra.id) ?? 0
+      const pendingBills = pendingBillsBySafra.get(safra.id) ?? 0
+      const totalBills = paidBills + pendingBills
+      const paidCosts = paidExpenses + paidBills
+      const pendingCosts = pendingExpenses + pendingBills
+      const totalCosts = totalExpenses + totalBills
+      const realizedResult = receivedRevenue - paidCosts
+      const projectedResult = totalRevenue - totalCosts
 
       return {
         safraId: safra.id,
@@ -340,9 +366,15 @@ export const ReportService = {
         paidExpenses,
         pendingExpenses,
         totalExpenses,
+        paidBills,
+        pendingBills,
+        totalBills,
+        paidCosts,
+        pendingCosts,
+        totalCosts,
         realizedResult,
         projectedResult,
-        costPerEstimatedUnit: perEstimatedUnit(totalExpenses, safra.estimatedYield),
+        costPerEstimatedUnit: perEstimatedUnit(totalCosts, safra.estimatedYield),
         revenuePerEstimatedUnit: perEstimatedUnit(totalRevenue, safra.estimatedYield),
         resultPerEstimatedUnit: perEstimatedUnit(projectedResult, safra.estimatedYield),
         revenueTotal: totalRevenue,
@@ -359,7 +391,7 @@ export const ReportService = {
     const summary = list.data[0]
     if (!summary) throw AppError.notFound('Safra')
 
-    const [expenses, revenues] = await Promise.all([
+    const [expenses, revenues, bills] = await Promise.all([
       prisma.expense.findMany({
         where: { companyId, deletedAt: null, safraId: id },
         select: {
@@ -388,29 +420,66 @@ export const ReportService = {
         },
         orderBy: { date: 'desc' },
       }),
+      prisma.bill.findMany({
+        where: { companyId, deletedAt: null, safraId: id },
+        select: {
+          id: true,
+          dueDate: true,
+          paidAt: true,
+          description: true,
+          amount: true,
+          status: true,
+          category: { select: { id: true, name: true } },
+        },
+        orderBy: { dueDate: 'desc' },
+      }),
     ])
 
-    const expensesByCategoryMap = new Map<string, {
-      categoryId: string
+    const costsByCategoryMap = new Map<string, {
+      categoryId: string | null
       categoryName: string
+      expenseAmount: number
+      billAmount: number
       paidAmount: number
       pendingAmount: number
       totalAmount: number
     }>()
 
     for (const expense of expenses) {
-      const current = expensesByCategoryMap.get(expense.category.id) ?? {
+      const current = costsByCategoryMap.get(expense.category.id) ?? {
         categoryId: expense.category.id,
         categoryName: expense.category.name,
+        expenseAmount: 0,
+        billAmount: 0,
         paidAmount: 0,
         pendingAmount: 0,
         totalAmount: 0,
       }
       const amount = toNumber(expense.amount)
+      current.expenseAmount += amount
       if (expense.status === 'PAID') current.paidAmount += amount
       if (expense.status === 'PENDING' || expense.status === 'OVERDUE') current.pendingAmount += amount
       current.totalAmount += amount
-      expensesByCategoryMap.set(expense.category.id, current)
+      costsByCategoryMap.set(expense.category.id, current)
+    }
+
+    for (const bill of bills) {
+      const key = bill.category?.id ?? 'uncategorized-bills'
+      const current = costsByCategoryMap.get(key) ?? {
+        categoryId: bill.category?.id ?? null,
+        categoryName: bill.category?.name ?? 'Sem categoria',
+        expenseAmount: 0,
+        billAmount: 0,
+        paidAmount: 0,
+        pendingAmount: 0,
+        totalAmount: 0,
+      }
+      const amount = toNumber(bill.amount)
+      current.billAmount += amount
+      if (bill.status === 'PAID') current.paidAmount += amount
+      if (bill.status === 'PENDING' || bill.status === 'OVERDUE') current.pendingAmount += amount
+      current.totalAmount += amount
+      costsByCategoryMap.set(key, current)
     }
 
     const revenuesByProductClientMap = new Map<string, {
@@ -444,6 +513,7 @@ export const ReportService = {
       ...revenues.map((revenue) => ({
         id: revenue.id,
         type: 'REVENUE' as const,
+        sourceLabel: 'Receita',
         date: revenue.receivedAt ?? revenue.date,
         description: revenue.client ?? revenue.notes ?? revenue.product.name,
         status: revenue.status,
@@ -452,16 +522,27 @@ export const ReportService = {
       ...expenses.map((expense) => ({
         id: expense.id,
         type: 'EXPENSE' as const,
+        sourceLabel: 'Despesa',
         date: expense.paidAt ?? expense.dueDate ?? expense.date,
         description: expense.description,
         status: expense.status,
         amount: toNumber(expense.amount),
       })),
+      ...bills.map((bill) => ({
+        id: bill.id,
+        type: 'BILL' as const,
+        sourceLabel: 'Boleto',
+        date: bill.paidAt ?? bill.dueDate,
+        description: bill.description,
+        status: bill.status,
+        amount: toNumber(bill.amount),
+      })),
     ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 20)
 
     return {
       summary,
-      expensesByCategory: Array.from(expensesByCategoryMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+      expensesByCategory: Array.from(costsByCategoryMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
+      costsByCategory: Array.from(costsByCategoryMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
       revenuesByProductClient: Array.from(revenuesByProductClientMap.values()).sort((a, b) => b.totalAmount - a.totalAmount),
       recentMovements,
     }
@@ -522,7 +603,9 @@ export const ReportService = {
           companyId,
           deletedAt: null,
           status: 'PAID',
+          ...(query.categoryId ? { categoryId: query.categoryId } : {}),
           ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+          ...(query.safraId ? { safraId: query.safraId } : {}),
           ...(query.accountId ? { accountId: query.accountId } : {}),
           ...cashDateFallbackWhere('paidAt', 'dueDate', bounds),
         },
@@ -533,7 +616,9 @@ export const ReportService = {
           amount: true,
           description: true,
           account: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true } },
           supplier: { select: { id: true, name: true } },
+          safra: { select: { id: true, name: true } },
         },
       }),
     ])
@@ -574,9 +659,9 @@ export const ReportService = {
         description: item.description,
         account: item.account,
         product: null,
-        category: null,
+        category: item.category,
         supplier: item.supplier,
-        safra: null,
+        safra: item.safra,
       })),
     ].sort((a, b) => b.date.getTime() - a.date.getTime())
 

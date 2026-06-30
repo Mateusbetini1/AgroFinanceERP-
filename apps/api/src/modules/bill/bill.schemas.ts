@@ -6,8 +6,10 @@ const optionalUuidSchema = z.preprocess((value) => (value === '' ? undefined : v
 export const createBillSchema = z
   .object({
     billGroupId: uuidSchema.optional(),
+    categoryId: optionalUuidSchema,
     supplierId: uuidSchema.optional(),
     accountId: uuidSchema.optional(),
+    safraId: optionalUuidSchema,
     description: z
       .string({ required_error: 'Descrição é obrigatória' })
       .min(1, 'Descrição não pode ser vazia')
@@ -29,8 +31,10 @@ export const createBillSchema = z
   )
 
 export const createBillInstallmentsSchema = z.object({
+  categoryId: optionalUuidSchema,
   supplierId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
+  safraId: optionalUuidSchema,
   description: z
     .string({ required_error: 'Descricao e obrigatoria' })
     .min(1, 'Descricao nao pode ser vazia')
@@ -48,8 +52,10 @@ export const createBillInstallmentsSchema = z.object({
 })
 
 export const createRecurringBillsSchema = z.object({
+  categoryId: optionalUuidSchema,
   supplierId: optionalUuidSchema,
   accountId: optionalUuidSchema,
+  safraId: optionalUuidSchema,
   description: z
     .string({ required_error: 'Descricao e obrigatoria' })
     .min(1, 'Descricao nao pode ser vazia')
@@ -70,8 +76,10 @@ export const createRecurringBillsSchema = z.object({
 export const updateBillSchema = z
   .object({
     billGroupId: uuidSchema.nullable().optional(),
+    categoryId: uuidSchema.nullable().optional(),
     supplierId: uuidSchema.nullable().optional(),
     accountId: uuidSchema.nullable().optional(),
+    safraId: uuidSchema.nullable().optional(),
     description: z.string().min(1).max(500).trim().optional(),
     amount: z.number().positive().optional(),
     dueDate: z.coerce.date().optional(),
@@ -92,6 +100,8 @@ export const listBillsSchema = paginationSchema.extend({
   supplierId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
   billGroupId: uuidSchema.optional(),
+  categoryId: uuidSchema.optional(),
+  safraId: uuidSchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
 })

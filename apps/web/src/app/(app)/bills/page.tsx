@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
 import { listAccounts } from '@/features/accounts/api'
+import { listCategories } from '@/features/categories/api'
 import {
   createBill,
   createBillInstallments,
@@ -19,6 +20,7 @@ import {
 import { BillForm, type BillFormSubmit } from '@/features/bills/components/bill-form'
 import { BillsTable } from '@/features/bills/components/bills-table'
 import { listSuppliers } from '@/features/suppliers/api'
+import { listSafras } from '@/features/safras/api'
 import { cn, getApiErrorMessage } from '@/lib/utils'
 import type { Bill } from '@/types/api'
 
@@ -27,10 +29,14 @@ export default function BillsPage() {
   const query = useQuery({ queryKey: ['bills'], queryFn: listBills })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
+  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
+  const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
 
   const bills = query.data?.data ?? []
   const suppliers = suppliersQuery.data?.data ?? []
   const accounts = accountsQuery.data?.data ?? []
+  const categories = categoriesQuery.data?.data ?? []
+  const safras = safrasQuery.data?.data ?? []
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Bill | null>(null)
@@ -112,8 +118,8 @@ export default function BillsPage() {
     else createMutation.mutate(submission.payload)
   }
 
-  const isAuxLoading = suppliersQuery.isLoading || accountsQuery.isLoading
-  const hasAuxError = suppliersQuery.isError || accountsQuery.isError
+  const isAuxLoading = suppliersQuery.isLoading || accountsQuery.isLoading || categoriesQuery.isLoading || safrasQuery.isLoading
+  const hasAuxError = suppliersQuery.isError || accountsQuery.isError || categoriesQuery.isError || safrasQuery.isError
 
   return (
     <>
@@ -161,6 +167,8 @@ export default function BillsPage() {
             initialValue={editing}
             suppliers={suppliers}
             accounts={accounts}
+            categories={categories}
+            safras={safras}
             isSubmitting={
               createMutation.isPending ||
               createInstallmentsMutation.isPending ||

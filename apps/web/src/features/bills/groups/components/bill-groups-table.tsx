@@ -42,7 +42,18 @@ export function BillGroupsTable({
   onSelect: (group: BillGroupSummary) => void
 }) {
   const columns: DataTableColumn<BillGroupSummary>[] = [
-    { header: 'Descricao', cell: (group) => <span className="font-medium">{group.description}</span> },
+    {
+      header: 'Descricao',
+      cell: (group) => (
+        <div>
+          <p className="font-medium">{group.description}</p>
+          <p className="text-xs text-muted-foreground">
+            {group.categoryMixed ? 'Categoria mista' : group.category?.name ?? 'Sem categoria'} |{' '}
+            {group.safraMixed ? 'Safra mista' : group.safra?.name ?? 'Sem safra'}
+          </p>
+        </div>
+      ),
+    },
     { header: 'Fornecedor', cell: (group) => group.supplier?.name ?? '-' },
     { header: 'Total original', cell: (group) => formatCurrency(group.totalAmount), className: 'text-right' },
     { header: 'Pago', cell: (group) => formatCurrency(group.paidAmount), className: 'text-right' },

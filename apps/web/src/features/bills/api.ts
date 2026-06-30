@@ -2,8 +2,10 @@ import { api } from '@/lib/api'
 import type { ApiResponse, Bill, BillStatus, PaginatedResponse } from '@/types/api'
 
 export interface BillPayload {
+  categoryId?: string | null
   supplierId?: string | null
   accountId?: string | null
+  safraId?: string | null
   description?: string
   amount?: number
   dueDate?: string
@@ -15,8 +17,10 @@ export interface BillPayload {
 }
 
 export interface BillInstallmentsPayload {
+  categoryId?: string
   supplierId?: string
   accountId?: string
+  safraId?: string
   description: string
   totalAmount: number
   installmentCount: number
@@ -25,8 +29,10 @@ export interface BillInstallmentsPayload {
 }
 
 export interface BillRecurringPayload {
+  categoryId?: string
   supplierId?: string
   accountId?: string
+  safraId?: string
   description: string
   amount: number
   firstDueDate: string
@@ -68,7 +74,9 @@ function cleanCreateBillPayload(payload: BillPayload): BillPayload {
   }
 
   if (payload.supplierId) clean.supplierId = payload.supplierId
-  if (payload.status === 'PAID' && payload.accountId) clean.accountId = payload.accountId
+  if (payload.categoryId) clean.categoryId = payload.categoryId
+  if (payload.safraId) clean.safraId = payload.safraId
+  if (payload.accountId) clean.accountId = payload.accountId
   if (payload.paidAt) clean.paidAt = payload.paidAt
   if (payload.fileUrl) clean.fileUrl = payload.fileUrl
   if (payload.installmentNumber) clean.installmentNumber = payload.installmentNumber
@@ -87,6 +95,8 @@ function cleanUpdateBillPayload(payload: BillPayload): BillPayload {
       if (
         key === 'supplierId' ||
         key === 'accountId' ||
+        key === 'categoryId' ||
+        key === 'safraId' ||
         key === 'paidAt' ||
         key === 'fileUrl' ||
         key === 'installmentNumber' ||
@@ -112,7 +122,9 @@ function cleanCreateBillInstallmentsPayload(payload: BillInstallmentsPayload): B
   }
 
   if (payload.supplierId) clean.supplierId = payload.supplierId
+  if (payload.categoryId) clean.categoryId = payload.categoryId
   if (payload.accountId) clean.accountId = payload.accountId
+  if (payload.safraId) clean.safraId = payload.safraId
   if (payload.fileUrl) clean.fileUrl = payload.fileUrl
 
   return clean
@@ -128,7 +140,9 @@ function cleanCreateBillRecurringPayload(payload: BillRecurringPayload): BillRec
   }
 
   if (payload.supplierId) clean.supplierId = payload.supplierId
+  if (payload.categoryId) clean.categoryId = payload.categoryId
   if (payload.accountId) clean.accountId = payload.accountId
+  if (payload.safraId) clean.safraId = payload.safraId
 
   return clean
 }

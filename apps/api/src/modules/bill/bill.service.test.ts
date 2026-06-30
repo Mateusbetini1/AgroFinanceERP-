@@ -12,10 +12,14 @@ function bill(overrides: Record<string, unknown> = {}) {
   return {
     id: 'bill-1',
     billGroupId: null,
+    categoryId: null,
+    category: null,
     supplierId: null,
     supplier: null,
     accountId: 'account-1',
     account: { id: 'account-1', name: 'Conta', type: 'BANK' },
+    safraId: null,
+    safra: null,
     description: 'Boleto',
     amount: 100,
     dueDate,
@@ -36,6 +40,14 @@ function mockAccount(id = 'account-1') {
 
 function mockSupplier(id = 'supplier-1') {
   prismaMock.supplier.findFirst.mockResolvedValue({ id })
+}
+
+function mockCategory(id = 'category-1') {
+  prismaMock.category.findFirst.mockResolvedValue({ id })
+}
+
+function mockSafra(id = 'safra-1') {
+  prismaMock.safra.findFirst.mockResolvedValue({ id })
 }
 
 function mockBillGroup(overrides: Record<string, unknown> = {}) {
@@ -176,6 +188,19 @@ describe('BillService balance rules', () => {
     )
   })
 
+  it('PATCH permite limpar categoryId e safraId com null', async () => {
+    prismaMock.bill.findFirst.mockResolvedValue(bill({ categoryId: 'category-1', safraId: 'safra-1' }))
+    prismaMock.bill.update.mockResolvedValue(bill({ categoryId: null, safraId: null }))
+
+    await BillService.update(companyId, 'bill-1', { categoryId: null, safraId: null }, req)
+
+    expect(prismaMock.category.findFirst).not.toHaveBeenCalled()
+    expect(prismaMock.safra.findFirst).not.toHaveBeenCalled()
+    expect(prismaMock.bill.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { categoryId: null, safraId: null } }),
+    )
+  })
+
   it('update PAID com mudanca de amount aplica diferenca', async () => {
     prismaMock.bill.findFirst.mockResolvedValue(bill({ status: 'PAID', amount: 150 }))
     prismaMock.bill.update.mockResolvedValue(bill({ status: 'PAID', amount: 100 }))
@@ -245,6 +270,53 @@ describe('BillService balance rules', () => {
     expect(prismaMock.bill.create).not.toHaveBeenCalled()
     expect(prismaMock.account.update).not.toHaveBeenCalled()
   })
+
+  it('create aceita categoryId e safraId validos', async () => {
+    mockCategory()
+    mockSafra()
+    prismaMock.bill.create.mockResolvedValue(bill({ categoryId: 'category-1', safraId: 'safra-1' }))
+
+    await BillService.create(
+      companyId,
+      { categoryId: 'category-1', safraId: 'safra-1', description: 'Adubo', amount: 100, dueDate, status: 'PENDING' },
+      req,
+    )
+
+    expect(prismaMock.category.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'category-1', companyId, deletedAt: null, type: { in: ['EXPENSE', 'BOTH'] } },
+      }),
+    )
+    expect(prismaMock.safra.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'safra-1', companyId, deletedAt: null } }),
+    )
+    expect(prismaMock.bill.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 'category-1', safraId: 'safra-1' }) }),
+    )
+  })
+
+  it('rejeita categoryId e safraId cross-company ou inexistentes', async () => {
+    prismaMock.category.findFirst.mockResolvedValue(null)
+
+    await expect(
+      BillService.create(
+        companyId,
+        { categoryId: 'other-category', description: 'Boleto', amount: 100, dueDate, status: 'PENDING' },
+        req,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
+
+    resetPrismaMock()
+    prismaMock.safra.findFirst.mockResolvedValue(null)
+
+    await expect(
+      BillService.create(
+        companyId,
+        { safraId: 'other-safra', description: 'Boleto', amount: 100, dueDate, status: 'PENDING' },
+        req,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
 })
 
 describe('BillService installment rules', () => {
@@ -255,14 +327,18 @@ describe('BillService installment rules', () => {
   it('cria BillGroup e N Bills PENDING sem alterar saldo', async () => {
     mockSupplier()
     mockAccount()
+    mockCategory()
+    mockSafra()
     prismaMock.billGroup.create.mockResolvedValue(mockBillGroup({ supplierId: 'supplier-1', installmentCount: 4 }))
     mockInstallmentCreates()
 
     const result = await BillService.createInstallments(
       companyId,
       {
+        categoryId: 'category-1',
         supplierId: 'supplier-1',
         accountId: 'account-1',
+        safraId: 'safra-1',
         description: 'Compra parcelada',
         totalAmount: 2000,
         installmentCount: 4,
@@ -283,6 +359,10 @@ describe('BillService installment rules', () => {
       }),
     )
     expect(prismaMock.bill.create).toHaveBeenCalledTimes(4)
+    expect(prismaMock.bill.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 'category-1', safraId: 'safra-1' }) }),
+    )
     expect(result.bills).toHaveLength(4)
     expect(result.bills.every((created) => created.status === 'PENDING')).toBe(true)
     expect(prismaMock.account.update).not.toHaveBeenCalled()
@@ -558,14 +638,18 @@ describe('BillService recurring bill generator', () => {
   it('gera N Bills PENDING sem alterar saldo, BillGroup ou Expense', async () => {
     mockSupplier()
     mockAccount()
+    mockCategory()
+    mockSafra()
     prismaMock.bill.findFirst.mockResolvedValue(null)
     mockRecurringCreates()
 
     const result = await BillService.createRecurringBills(
       companyId,
       {
+        categoryId: 'category-1',
         supplierId: 'supplier-1',
         accountId: 'account-1',
+        safraId: 'safra-1',
         description: 'Energia eletrica',
         amount: 700,
         firstDueDate: new Date('2026-07-15T12:00:00.000Z'),
@@ -582,6 +666,10 @@ describe('BillService recurring bill generator', () => {
       expect.objectContaining({ where: { id: 'account-1', companyId, deletedAt: null, active: true } }),
     )
     expect(prismaMock.bill.create).toHaveBeenCalledTimes(3)
+    expect(prismaMock.bill.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 'category-1', safraId: 'safra-1' }) }),
+    )
     expect(result.countCreated).toBe(3)
     expect(result.countSkipped).toBe(0)
     expect(result.created.every((created) => created.status === 'PENDING')).toBe(true)

@@ -6,12 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { dateInputToIso, formatCurrency, formatDate, toDateInputValue } from '@/lib/utils'
-import type { Account, Supplier } from '@/types/api'
+import type { Account, Category, Safra, Supplier } from '@/types/api'
 import type { BillRecurringPayload } from '../api'
 
 interface BillRecurringFormProps {
   suppliers: Supplier[]
   accounts: Account[]
+  categories: Category[]
+  safras: Safra[]
   isSubmitting?: boolean
   onSubmit: (payload: BillRecurringPayload) => void
 }
@@ -30,9 +32,11 @@ function addMonthsClamped(date: Date, months: number): Date {
   return new Date(targetYear, targetMonth, targetDay, 12)
 }
 
-export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit }: BillRecurringFormProps) {
+export function BillRecurringForm({ suppliers, accounts, categories, safras, isSubmitting, onSubmit }: BillRecurringFormProps) {
+  const [categoryId, setCategoryId] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [safraId, setSafraId] = useState('')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [firstDueDate, setFirstDueDate] = useState(toDateInputValue(new Date()))
@@ -42,6 +46,8 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
 
   const selectedSupplier = suppliers.find((supplier) => supplier.id === supplierId)
   const selectedAccount = accounts.find((account) => account.id === accountId)
+  const selectedCategory = categories.find((category) => category.id === categoryId)
+  const selectedSafra = safras.find((safra) => safra.id === safraId)
 
   const preview = useMemo(() => {
     const parsedAmount = Number(amount)
@@ -88,8 +94,10 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
     }
 
     onSubmit({
+      categoryId: categoryId || undefined,
       supplierId: supplierId || undefined,
       accountId: accountId || undefined,
+      safraId: safraId || undefined,
       description: description.trim(),
       amount: parsedAmount,
       firstDueDate: dateInputToIso(firstDueDate)!,
@@ -128,6 +136,20 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
+          <Label htmlFor="recurring-category">Categoria</Label>
+          <Select id="recurring-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">Sem categoria</option>
+            {categories
+              .filter((category) => category.active && (category.type === 'EXPENSE' || category.type === 'BOTH'))
+              .map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="recurring-supplier">Fornecedor</Label>
           <Select id="recurring-supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
             <option value="">Sem fornecedor</option>
@@ -138,6 +160,9 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
             ))}
           </Select>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
 
         <div className="space-y-2">
           <Label htmlFor="recurring-account">Conta prevista</Label>
@@ -148,6 +173,20 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
                 {account.name} ({formatCurrency(account.currentBalance)})
               </option>
             ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="recurring-safra">Safra/Ciclo produtivo</Label>
+          <Select id="recurring-safra" value={safraId} onChange={(event) => setSafraId(event.target.value)}>
+            <option value="">Sem safra</option>
+            {safras
+              .filter((safra) => safra.active)
+              .map((safra) => (
+                <option key={safra.id} value={safra.id}>
+                  {safra.name}
+                </option>
+              ))}
           </Select>
         </div>
       </div>
@@ -213,7 +252,7 @@ export function BillRecurringForm({ suppliers, accounts, isSubmitting, onSubmit 
             ))}
           </div>
           <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-            Conta prevista: {selectedAccount?.name ?? 'Sem conta'}
+            Categoria: {selectedCategory?.name ?? 'Sem categoria'} | Safra: {selectedSafra?.name ?? 'Sem safra'} | Conta prevista: {selectedAccount?.name ?? 'Sem conta'}
           </div>
         </div>
       )}

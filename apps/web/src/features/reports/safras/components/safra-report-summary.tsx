@@ -41,23 +41,27 @@ export function SafraReportSummary({ items }: { items: SafraReportSummaryType[] 
     (acc, item) => {
       acc.revenue += item.totalRevenue
       acc.expenses += item.totalExpenses
+      acc.bills += item.totalBills
+      acc.costs += item.totalCosts
       acc.projected += item.projectedResult
       acc.realized += item.realizedResult
       if (item.estimatedYield && item.estimatedYield > 0) {
-        acc.expensesForUnit += item.totalExpenses
+        acc.expensesForUnit += item.totalCosts
         acc.yieldForUnit += item.estimatedYield
       }
       return acc
     },
-    { revenue: 0, expenses: 0, projected: 0, realized: 0, expensesForUnit: 0, yieldForUnit: 0 },
+    { revenue: 0, expenses: 0, bills: 0, costs: 0, projected: 0, realized: 0, expensesForUnit: 0, yieldForUnit: 0 },
   )
 
   const costPerUnit = totals.yieldForUnit > 0 ? totals.expensesForUnit / totals.yieldForUnit : null
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
       <SummaryCard title="Receitas totais" value={formatCurrency(totals.revenue)} icon={TrendingUp} tone="positive" />
-      <SummaryCard title="Despesas totais" value={formatCurrency(totals.expenses)} icon={TrendingDown} tone="negative" />
+      <SummaryCard title="Despesas lancadas" value={formatCurrency(totals.expenses)} icon={TrendingDown} tone="negative" />
+      <SummaryCard title="Boletos/contas" value={formatCurrency(totals.bills)} icon={WalletCards} tone="warning" />
+      <SummaryCard title="Custos totais" value={formatCurrency(totals.costs)} icon={TrendingDown} tone="negative" />
       <SummaryCard
         title="Resultado previsto"
         value={formatCurrency(totals.projected)}
