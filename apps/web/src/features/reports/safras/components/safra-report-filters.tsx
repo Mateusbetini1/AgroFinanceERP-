@@ -95,7 +95,7 @@ export function SafraReportFilters({
           <option value="">Todos</option>
           <option value="PLANNED">Planejada</option>
           <option value="ACTIVE">Ativa</option>
-          <option value="COMPLETED">Concluida</option>
+          <option value="COMPLETED">Concluída</option>
           <option value="CANCELLED">Cancelada</option>
         </Select>
       </div>

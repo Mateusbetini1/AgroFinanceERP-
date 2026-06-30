@@ -50,6 +50,7 @@ export function formatStatusLabel(status: string | null | undefined): string {
     ACTIVE: 'Ativo',
     INACTIVE: 'Inativo',
     PENDING: 'Pendente',
+    IN_PROGRESS: 'Em andamento',
     RECEIVED: 'Recebido',
     PAID: 'Pago',
     OVERDUE: 'Vencido',
@@ -64,7 +65,7 @@ export function formatSafraStatus(status: string | null | undefined): string {
   const labels: Record<string, string> = {
     PLANNED: 'Planejada',
     ACTIVE: 'Ativa',
-    COMPLETED: 'Concluida',
+    COMPLETED: 'Concluída',
     CANCELLED: 'Cancelada',
   }
 
@@ -103,8 +104,8 @@ export function formatFarmLocationType(type: string | null | undefined): string 
 
   const labels: Record<string, string> = {
     GREENHOUSE: 'Estufa',
-    PLOT: 'Talhao',
-    FIELD: 'Campo/Area',
+    PLOT: 'Talhão',
+    FIELD: 'Campo/Área',
   }
 
   return labels[type] ?? type

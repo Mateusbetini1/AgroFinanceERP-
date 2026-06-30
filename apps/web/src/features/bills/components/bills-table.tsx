@@ -27,7 +27,7 @@ export function BillsTable({
 }) {
   const columns: DataTableColumn<Bill>[] = [
     {
-      header: 'Descricao',
+      header: 'Descrição',
       cell: (bill) => (
         <div>
           <p className="font-medium">{bill.description}</p>

@@ -15,7 +15,7 @@ function alertLabel(alert: ForecastAlertLevel) {
 
 export function ForecastTable({ months }: { months: ForecastMonth[] }) {
   const columns: DataTableColumn<ForecastMonth>[] = [
-    { header: 'Mes', cell: (month) => monthLabel(month.month, month.year) },
+    { header: 'Mês', cell: (month) => monthLabel(month.month, month.year) },
     { header: 'Saldo inicial projetado', cell: (month) => formatCurrency(month.startingBalance) },
     { header: 'Receitas previstas', cell: (month) => formatCurrency(month.projectedReceivables) },
     { header: 'Despesas previstas', cell: (month) => formatCurrency(month.projectedExpenses) },

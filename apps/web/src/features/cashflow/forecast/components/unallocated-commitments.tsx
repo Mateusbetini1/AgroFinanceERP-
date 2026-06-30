@@ -9,18 +9,18 @@ function monthLabel(month: number, year: number) {
 
 export function UnallocatedCommitments({ forecast }: { forecast: CashflowForecast }) {
   const columns: DataTableColumn<UnallocatedForecastMonth>[] = [
-    { header: 'Mes', cell: (month) => monthLabel(month.month, month.year) },
+    { header: 'Mês', cell: (month) => monthLabel(month.month, month.year) },
     { header: 'Receitas sem conta', cell: (month) => formatCurrency(month.receivables) },
     { header: 'Despesas sem conta', cell: (month) => formatCurrency(month.expenses) },
     { header: 'Boletos sem conta', cell: (month) => formatCurrency(month.bills) },
     { header: 'Folha sem conta', cell: (month) => formatCurrency(month.payroll) },
-    { header: 'Liquido nao alocado', cell: (month) => formatCurrency(month.net) },
+    { header: 'Líquido não alocado', cell: (month) => formatCurrency(month.net) },
   ]
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Compromissos nao alocados</CardTitle>
+        <CardTitle className="text-base">Compromissos não alocados</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 text-sm sm:grid-cols-3">
@@ -29,11 +29,11 @@ export function UnallocatedCommitments({ forecast }: { forecast: CashflowForecas
             <p className="font-medium">{formatCurrency(forecast.unallocated.totalInflows)}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">Saidas sem conta</p>
+            <p className="text-muted-foreground">Saídas sem conta</p>
             <p className="font-medium">{formatCurrency(forecast.unallocated.totalOutflows)}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">Liquido nao alocado</p>
+            <p className="text-muted-foreground">Líquido não alocado</p>
             <p className="font-medium">
               {formatCurrency(forecast.unallocated.totalInflows - forecast.unallocated.totalOutflows)}
             </p>

@@ -125,7 +125,7 @@ export default function BillsPage() {
     <>
       <ListPage
         title="Boletos"
-        description="Boletos pendentes, pagos e vencidos."
+        description="Contas individuais a pagar, pendentes, pagas ou vencidas."
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={bills.length === 0}

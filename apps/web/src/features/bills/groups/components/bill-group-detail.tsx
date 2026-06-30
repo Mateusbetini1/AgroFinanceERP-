@@ -21,7 +21,7 @@ export function BillGroupDetailPanel({ detail }: { detail: BillGroupDetail }) {
           ? `${installment.installmentNumber}/${installment.installmentCount}`
           : '-',
     },
-    { header: 'Descricao', cell: (installment) => installment.description },
+    { header: 'Descrição', cell: (installment) => installment.description },
     { header: 'Categoria', cell: (installment) => installment.category?.name ?? '-' },
     { header: 'Safra', cell: (installment) => installment.safra?.name ?? '-' },
     { header: 'Fornecedor', cell: (installment) => installment.supplier?.name ?? '-' },

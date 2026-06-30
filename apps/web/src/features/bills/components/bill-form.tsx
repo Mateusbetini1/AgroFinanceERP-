@@ -417,7 +417,7 @@ export function BillForm({ initialValue, suppliers, accounts, categories, safras
       )}
 
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        Use Boletos para compromissos a pagar. Use Despesas para despesas lancadas diretamente. Evite lancar o mesmo gasto nos dois lugares.
+        Use Boletos para compromissos a pagar. Use Despesas para despesas lançadas diretamente. Evite lançar o mesmo gasto nos dois lugares.
       </div>
 
       {error && (

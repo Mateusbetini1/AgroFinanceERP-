@@ -31,7 +31,7 @@ export default function CashflowForecastPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">Fluxo de Caixa Projetado</h1>
           <p className="text-sm text-muted-foreground">
-            Projecao mensal de caixa considerando recebiveis, despesas, boletos e folha prevista.
+            Projeção mensal de caixa considerando recebíveis, despesas, boletos e folha prevista.
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void query.refetch()}>
@@ -41,8 +41,8 @@ export default function CashflowForecastPage() {
       </div>
 
       <InlineAlert tone="success">
-        A projecao total considera compromissos conhecidos. A projecao por conta e parcial e depende dos lancamentos
-        terem conta definida. Valores sem conta aparecem como nao alocados.
+        A projeção total considera compromissos conhecidos. A projeção por conta é parcial e depende dos lançamentos
+        terem conta definida. Valores sem conta aparecem como não alocados.
       </InlineAlert>
 
       <Card>
@@ -61,7 +61,7 @@ export default function CashflowForecastPage() {
           </div>
           {forecast && (
             <p className="text-sm text-muted-foreground">
-              Periodo: {String(forecast.period.startMonth).padStart(2, '0')}/{forecast.period.startYear} ate{' '}
+              Período: {String(forecast.period.startMonth).padStart(2, '0')}/{forecast.period.startYear} até{' '}
               {String(forecast.period.endMonth).padStart(2, '0')}/{forecast.period.endYear}
             </p>
           )}
@@ -72,7 +72,7 @@ export default function CashflowForecastPage() {
         <Card>
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Spinner className="h-5 w-5 text-primary" />
-            Carregando projecao...
+            Carregando projeção...
           </CardContent>
         </Card>
       )}
@@ -82,7 +82,7 @@ export default function CashflowForecastPage() {
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p className="font-medium">{getApiErrorMessage(query.error, 'Nao foi possivel carregar a projecao.')}</p>
+              <p className="font-medium">{getApiErrorMessage(query.error, 'Não foi possível carregar a projeção.')}</p>
             </div>
             <Button type="button" variant="outline" onClick={() => void query.refetch()}>
               Tentar novamente
@@ -108,8 +108,8 @@ export default function CashflowForecastPage() {
 
           <section className="space-y-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-normal text-foreground">Projecao mensal total</h2>
-              <p className="text-sm text-muted-foreground">Saldo inicial e final projetado mes a mes.</p>
+              <h2 className="text-lg font-semibold tracking-normal text-foreground">Projeção mensal total</h2>
+              <p className="text-sm text-muted-foreground">Saldo inicial e final projetado mês a mês.</p>
             </div>
             <Card>
               <CardContent className="p-0">
@@ -120,9 +120,9 @@ export default function CashflowForecastPage() {
 
           <section className="space-y-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-normal text-foreground">Projecao por conta</h2>
+              <h2 className="text-lg font-semibold tracking-normal text-foreground">Projeção por conta</h2>
               <p className="text-sm text-muted-foreground">
-                Visao parcial baseada apenas em recebiveis e compromissos com conta definida.
+                Visão parcial baseada apenas em recebíveis e compromissos com conta definida.
               </p>
             </div>
             <AccountForecastTable accounts={forecast.accounts} />

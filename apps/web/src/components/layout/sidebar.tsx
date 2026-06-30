@@ -34,7 +34,7 @@ const enabledItems = [
   { href: '/bills/installments', label: 'Parcelamentos', icon: ListChecks },
   { href: '/safras', label: 'Safras', icon: Sprout },
   { href: '/farm-locations', label: 'Locais', icon: MapPin },
-  { href: '/reports/safras', label: 'Relatorios', icon: FileText },
+  { href: '/reports/safras', label: 'Relatórios', icon: FileText },
   { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
   { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
   { href: '/employees', label: 'Funcionários', icon: Users },

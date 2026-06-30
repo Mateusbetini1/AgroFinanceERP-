@@ -31,7 +31,7 @@ export function AccountForecastTable({ accounts }: { accounts: AccountForecast[]
     { header: 'Saldo final projetado', cell: (account) => formatCurrency(account.finalProjectedBalance) },
     { header: 'Menor saldo projetado', cell: (account) => formatCurrency(account.lowestProjectedBalance) },
     {
-      header: 'Primeiro mes negativo',
+      header: 'Primeiro mês negativo',
       cell: (account) =>
         account.firstNegativeMonth ? monthLabel(account.firstNegativeMonth.month, account.firstNegativeMonth.year) : '-',
     },
@@ -53,7 +53,7 @@ export function AccountForecastTable({ accounts }: { accounts: AccountForecast[]
   ]
 
   const monthColumns: DataTableColumn<AccountForecastMonth>[] = [
-    { header: 'Mes', cell: (month) => monthLabel(month.month, month.year) },
+    { header: 'Mês', cell: (month) => monthLabel(month.month, month.year) },
     { header: 'Saldo inicial', cell: (month) => formatCurrency(month.startingBalance) },
     { header: 'Receitas', cell: (month) => formatCurrency(month.projectedReceivables) },
     { header: 'Despesas', cell: (month) => formatCurrency(month.projectedExpenses) },

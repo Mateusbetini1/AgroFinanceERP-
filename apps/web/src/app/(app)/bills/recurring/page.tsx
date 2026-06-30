@@ -43,7 +43,7 @@ export default function RecurringBillsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">Gerar Recorrentes</h1>
           <p className="text-sm text-muted-foreground">
-            Gere boletos futuros pendentes para compromissos mensais conhecidos.
+            Gere boletos futuros pendentes em lote, sem salvar regra automática de recorrência.
           </p>
         </div>
         <Link
@@ -68,13 +68,13 @@ export default function RecurringBillsPage() {
       )}
 
       {isError && (
-        <InlineAlert>Nao foi possivel carregar fornecedores e contas. Tente novamente antes de gerar.</InlineAlert>
+        <InlineAlert>Não foi possível carregar fornecedores, categorias, safras e contas. Tente novamente antes de gerar.</InlineAlert>
       )}
 
       {!isLoading && !isError && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Dados da recorrencia</CardTitle>
+            <CardTitle className="text-base">Dados da recorrência</CardTitle>
           </CardHeader>
           <CardContent>
             <BillRecurringForm
@@ -114,7 +114,7 @@ export default function RecurringBillsPage() {
                 <div className="divide-y">
                   {mutation.data.skipped.map((item) => (
                     <div key={`${item.existingBillId}-${item.dueDate}`} className="px-3 py-2 text-sm">
-                      {formatDate(item.dueDate)} - boleto ja existente
+                      {formatDate(item.dueDate)} - boleto já existente
                     </div>
                   ))}
                 </div>

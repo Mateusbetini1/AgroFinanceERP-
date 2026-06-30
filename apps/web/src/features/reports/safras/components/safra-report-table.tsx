@@ -33,13 +33,13 @@ export function SafraReportTable({
       cell: (item) => <Badge variant={item.status === 'ACTIVE' ? 'success' : 'muted'}>{formatSafraStatus(item.status)}</Badge>,
     },
     { header: 'Receitas', cell: (item) => formatCurrency(item.totalRevenue) },
-    { header: 'Despesas lancadas', cell: (item) => formatCurrency(item.totalExpenses) },
+    { header: 'Despesas lançadas', cell: (item) => formatCurrency(item.totalExpenses) },
     { header: 'Boletos/contas', cell: (item) => formatCurrency(item.totalBills) },
     { header: 'Custos totais', cell: (item) => formatCurrency(item.totalCosts) },
     { header: 'Resultado previsto', cell: (item) => formatCurrency(item.projectedResult) },
     { header: 'Resultado realizado', cell: (item) => formatCurrency(item.realizedResult) },
     {
-      header: 'Producao estimada',
+      header: 'Produção estimada',
       cell: (item) =>
         item.estimatedYield === null
           ? '-'

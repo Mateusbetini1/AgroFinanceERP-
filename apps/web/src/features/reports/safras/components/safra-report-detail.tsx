@@ -29,7 +29,7 @@ export function SafraReportDetail({ detail }: { detail: SafraReportDetailType })
   const movementColumns: DataTableColumn<SafraReportMovement>[] = [
     { header: 'Data', cell: (item) => formatDate(item.date) },
     { header: 'Tipo', cell: (item) => item.sourceLabel ?? (item.type === 'REVENUE' ? 'Receita' : item.type === 'BILL' ? 'Boleto' : 'Despesa') },
-    { header: 'Descricao', cell: (item) => item.description },
+    { header: 'Descrição', cell: (item) => item.description },
     { header: 'Status', cell: (item) => item.status },
     { header: 'Valor', cell: (item) => formatCurrency(item.amount) },
   ]
@@ -118,11 +118,11 @@ export function SafraReportDetail({ detail }: { detail: SafraReportDetailType })
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Ultimos lancamentos vinculados</CardTitle>
+          <CardTitle className="text-base">Últimos lançamentos vinculados</CardTitle>
         </CardHeader>
         <CardContent>
           {detail.recentMovements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum lancamento vinculado.</p>
+            <p className="text-sm text-muted-foreground">Nenhum lançamento vinculado.</p>
           ) : (
             <DataTable columns={movementColumns} data={detail.recentMovements} getRowKey={(item) => `${item.type}:${item.id}`} />
           )}

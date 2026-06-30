@@ -27,15 +27,15 @@ export function BillGroupSummaryCards({ summary }: { summary: BillGroupSummary }
           <Metric label="Parcelas ativas" value={`${summary.activeInstallments}/${summary.installmentCount}`} />
           <Metric label="Parcelas pagas" value={String(summary.paidInstallments)} />
           <Metric label="Parcelas vencidas" value={String(summary.overdueInstallments)} />
-          <Metric label="Proximo vencimento" value={formatDate(summary.nextDueDate)} />
+          <Metric label="Próximo vencimento" value={formatDate(summary.nextDueDate)} />
           <Metric label="Categoria" value={summary.categoryMixed ? 'Misto' : summary.category?.name ?? '-'} />
           <Metric label="Safra" value={summary.safraMixed ? 'Misto' : summary.safra?.name ?? '-'} />
         </div>
         {summary.deletedInstallments > 0 && (
           <p className="mt-4 text-xs text-muted-foreground">
-            {summary.deletedInstallments} parcela{summary.deletedInstallments === 1 ? '' : 's'} excluida
-            {summary.deletedInstallments === 1 ? '' : 's'} nao entra
-            {summary.deletedInstallments === 1 ? '' : 'm'} nos calculos.
+            {summary.deletedInstallments} parcela{summary.deletedInstallments === 1 ? '' : 's'} excluída
+            {summary.deletedInstallments === 1 ? '' : 's'} não entra
+            {summary.deletedInstallments === 1 ? '' : 'm'} nos cálculos.
           </p>
         )}
       </CardContent>

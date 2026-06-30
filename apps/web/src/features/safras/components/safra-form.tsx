@@ -12,10 +12,10 @@ import type { FarmLocation, Product, Safra, SafraStatus } from '@/types/api'
 import type { SafraPayload } from '../api'
 
 const statusOptions: Array<{ value: SafraStatus; label: string; description: string }> = [
-  { value: 'PLANNED', label: 'Planejada', description: 'ainda nao comecou' },
-  { value: 'ACTIVE', label: 'Ativa', description: 'esta em andamento' },
-  { value: 'COMPLETED', label: 'Concluida', description: 'terminou' },
-  { value: 'CANCELLED', label: 'Cancelada', description: 'nao foi para frente' },
+  { value: 'PLANNED', label: 'Planejada', description: 'ainda não começou' },
+  { value: 'ACTIVE', label: 'Ativa', description: 'está em andamento' },
+  { value: 'COMPLETED', label: 'Concluída', description: 'terminou' },
+  { value: 'CANCELLED', label: 'Cancelada', description: 'não foi para frente' },
 ]
 
 interface SafraFormProps {
@@ -80,7 +80,7 @@ export function SafraForm({
     if (!startDate) return 'Informe a data de inicio.'
     if (endDate && endDate <= startDate) return 'Data de fim deve ser posterior a data de inicio.'
     if (parsedYield !== null && (!Number.isFinite(parsedYield) || parsedYield < 0)) {
-      return 'Producao estimada deve ser um numero maior ou igual a zero.'
+      return 'Produção estimada deve ser um número maior ou igual a zero.'
     }
     if (!status) return 'Selecione o status da safra.'
 
@@ -191,7 +191,7 @@ export function SafraForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="safra-yield">Producao estimada {selectedProduct ? `(${formatUnit(selectedProduct.unit)})` : ''}</Label>
+          <Label htmlFor="safra-yield">Produção estimada {selectedProduct ? `(${formatUnit(selectedProduct.unit)})` : ''}</Label>
           <Input
             id="safra-yield"
             type="number"
@@ -227,7 +227,7 @@ export function SafraForm({
       )}
 
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        Receitas e despesas podem ser vinculadas a esta safra. O resultado por safra sera tratado futuramente em relatorios.
+        Receitas e despesas podem ser vinculadas a esta safra. O resultado por safra será tratado futuramente em relatórios.
       </div>
 
       {error && (

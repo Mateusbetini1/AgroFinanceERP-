@@ -69,13 +69,13 @@ export default function BillInstallmentsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-normal text-foreground">Parcelamentos</h1>
           <p className="text-sm text-muted-foreground">
-            Visualize compras parceladas criadas em boletos como um conjunto.
+            Visão de grupos de parcelas criados a partir de boletos parcelados.
           </p>
         </div>
       </div>
 
       <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        Esta visao agrupa parcelas criadas em Boletos. Edicao, pagamento e exclusao continuam sendo feitos em cada
+        Esta visão agrupa parcelas criadas em Boletos. Edição, pagamento e exclusão continuam sendo feitos em cada
         parcela individual.
       </p>
 
@@ -89,7 +89,7 @@ export default function BillInstallmentsPage() {
                 id="bill-group-search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Descricao do parcelamento"
+                placeholder="Descrição do parcelamento"
                 className="pl-9"
               />
             </div>

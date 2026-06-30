@@ -77,7 +77,7 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
     const parsedMonths = Number(months)
 
     if (!description.trim()) {
-      setError('Informe a descricao.')
+      setError('Informe a descrição.')
       return
     }
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -89,7 +89,7 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
       return
     }
     if (!Number.isInteger(parsedMonths) || parsedMonths < 1 || parsedMonths > 24) {
-      setError('Quantidade de meses deve ser um numero inteiro entre 1 e 24.')
+      setError('Quantidade de meses deve ser um número inteiro entre 1 e 24.')
       return
     }
 
@@ -110,7 +110,7 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
     <form className="space-y-5" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="recurring-description">Descricao</Label>
+          <Label htmlFor="recurring-description">Descrição</Label>
           <Input
             id="recurring-description"
             value={description}
@@ -234,13 +234,13 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
           onChange={(event) => setSkipExisting(event.target.checked)}
         />
         <span>
-          Ignorar boletos ja existentes com mesma descricao, valor, vencimento, fornecedor e conta prevista.
+          Ignorar boletos já existentes com mesma descrição, valor, vencimento, fornecedor e conta prevista.
         </span>
       </label>
 
       {preview.length > 0 && (
         <div className="rounded-md border">
-          <div className="border-b px-3 py-2 text-sm font-medium">Previa dos boletos</div>
+          <div className="border-b px-3 py-2 text-sm font-medium">Prévia dos boletos</div>
           <div className="divide-y">
             {preview.map((item) => (
               <div key={item.number} className="grid grid-cols-4 gap-3 px-3 py-2 text-sm">
@@ -258,8 +258,8 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
       )}
 
       <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        Esta ferramenta gera boletos futuros pendentes em lote. Nesta versao, nenhuma regra recorrente fica salva para
-        geracao automatica futura. Cada boleto gerado pode ser editado, pago ou excluido individualmente.
+        Esta ferramenta gera boletos futuros pendentes em lote. Nesta versão, nenhuma regra recorrente fica salva para
+        geração automática futura. Cada boleto gerado pode ser editado, pago ou excluído individualmente.
       </p>
 
       {error && (

@@ -52,15 +52,15 @@ export default function SafraReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-normal text-foreground">Relatorio por Safra</h1>
+        <h1 className="text-2xl font-semibold tracking-normal text-foreground">Relatório por Safra</h1>
         <p className="text-sm text-muted-foreground">
           Resultado financeiro por ciclo produtivo, separando realizado e previsto.
         </p>
       </div>
 
       <InlineAlert tone="success">
-        Este relatorio considera receitas, despesas e boletos vinculados diretamente a safra. Folha de funcionarios e
-        movimentacoes sem vinculo com safra nao entram nesta versao.
+        Este relatório considera receitas, despesas e boletos vinculados diretamente à safra. Folha de funcionários e
+        movimentações sem vínculo com safra não entram nesta versão.
       </InlineAlert>
 
       <Card>
@@ -80,7 +80,7 @@ export default function SafraReportsPage() {
 
       {hasAuxError && (
         <InlineAlert>
-          Nao foi possivel carregar todos os filtros de apoio. O relatorio ainda pode ser consultado.
+          Não foi possível carregar todos os filtros de apoio. O relatório ainda pode ser consultado.
         </InlineAlert>
       )}
 
@@ -88,7 +88,7 @@ export default function SafraReportsPage() {
         <Card>
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Spinner className="h-5 w-5 text-primary" />
-            Carregando relatorio...
+            Carregando relatório...
           </CardContent>
         </Card>
       )}
@@ -98,7 +98,7 @@ export default function SafraReportsPage() {
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p className="font-medium">{getApiErrorMessage(reportsQuery.error, 'Nao foi possivel carregar o relatorio.')}</p>
+              <p className="font-medium">{getApiErrorMessage(reportsQuery.error, 'Não foi possível carregar o relatório.')}</p>
             </div>
             <Button type="button" variant="outline" onClick={() => void reportsQuery.refetch()}>
               Tentar novamente
@@ -133,7 +133,7 @@ export default function SafraReportsPage() {
       )}
 
       {selectedSafraId && detailQuery.isError && (
-        <InlineAlert>{getApiErrorMessage(detailQuery.error, 'Nao foi possivel carregar o detalhe da safra.')}</InlineAlert>
+        <InlineAlert>{getApiErrorMessage(detailQuery.error, 'Não foi possível carregar o detalhe da safra.')}</InlineAlert>
       )}
 
       {detailQuery.data && <SafraReportDetail detail={detailQuery.data} />}

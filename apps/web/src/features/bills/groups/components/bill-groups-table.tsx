@@ -43,7 +43,7 @@ export function BillGroupsTable({
 }) {
   const columns: DataTableColumn<BillGroupSummary>[] = [
     {
-      header: 'Descricao',
+      header: 'Descrição',
       cell: (group) => (
         <div>
           <p className="font-medium">{group.description}</p>
@@ -59,7 +59,7 @@ export function BillGroupsTable({
     { header: 'Pago', cell: (group) => formatCurrency(group.paidAmount), className: 'text-right' },
     { header: 'Pendente', cell: (group) => formatCurrency(group.pendingAmount), className: 'text-right' },
     { header: 'Parcelas', cell: (group) => <InstallmentProgress group={group} /> },
-    { header: 'Proximo venc.', cell: (group) => formatDate(group.nextDueDate) },
+    { header: 'Próximo venc.', cell: (group) => formatDate(group.nextDueDate) },
     {
       header: 'Status',
       cell: (group) => <Badge variant={statusVariant(group.status)}>{formatBillGroupStatus(group.status)}</Badge>,

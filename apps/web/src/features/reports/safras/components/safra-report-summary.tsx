@@ -59,7 +59,7 @@ export function SafraReportSummary({ items }: { items: SafraReportSummaryType[] 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
       <SummaryCard title="Receitas totais" value={formatCurrency(totals.revenue)} icon={TrendingUp} tone="positive" />
-      <SummaryCard title="Despesas lancadas" value={formatCurrency(totals.expenses)} icon={TrendingDown} tone="negative" />
+      <SummaryCard title="Despesas lançadas" value={formatCurrency(totals.expenses)} icon={TrendingDown} tone="negative" />
       <SummaryCard title="Boletos/contas" value={formatCurrency(totals.bills)} icon={WalletCards} tone="warning" />
       <SummaryCard title="Custos totais" value={formatCurrency(totals.costs)} icon={TrendingDown} tone="negative" />
       <SummaryCard
