@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { paginationSchema, uuidSchema } from '@agrofinance/shared'
 
+const optionalUuidSchema = z.preprocess((value) => (value === '' ? undefined : value), uuidSchema.optional())
+
 export const createBillSchema = z
   .object({
     billGroupId: uuidSchema.optional(),
@@ -45,6 +47,26 @@ export const createBillInstallmentsSchema = z.object({
   fileUrl: z.string().url('URL do arquivo invalida').optional(),
 })
 
+export const createRecurringBillsSchema = z.object({
+  supplierId: optionalUuidSchema,
+  accountId: optionalUuidSchema,
+  description: z
+    .string({ required_error: 'Descricao e obrigatoria' })
+    .min(1, 'Descricao nao pode ser vazia')
+    .max(500, 'Descricao deve ter no maximo 500 caracteres')
+    .trim(),
+  amount: z
+    .number({ required_error: 'Valor e obrigatorio' })
+    .positive('Valor deve ser maior que zero'),
+  firstDueDate: z.coerce.date({ required_error: 'Primeiro vencimento e obrigatorio' }),
+  months: z
+    .number({ required_error: 'Quantidade de meses e obrigatoria' })
+    .int('Quantidade de meses deve ser um numero inteiro')
+    .min(1, 'Quantidade de meses deve ser no minimo 1')
+    .max(24, 'Quantidade de meses deve ser no maximo 24'),
+  skipExisting: z.boolean().default(true),
+})
+
 export const updateBillSchema = z
   .object({
     billGroupId: uuidSchema.nullable().optional(),
@@ -86,6 +108,7 @@ export const billParamsSchema = z.object({ id: uuidSchema })
 
 export type CreateBillDto = z.infer<typeof createBillSchema>
 export type CreateBillInstallmentsDto = z.infer<typeof createBillInstallmentsSchema>
+export type CreateRecurringBillsDto = z.infer<typeof createRecurringBillsSchema>
 export type UpdateBillDto = z.infer<typeof updateBillSchema>
 export type ListBillsQuery = z.infer<typeof listBillsSchema>
 export type BillGroupStatus = z.infer<typeof billGroupStatusSchema>

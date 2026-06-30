@@ -8,6 +8,7 @@ import { AuditAction } from '@agrofinance/shared'
 import type {
   CreateBillDto,
   CreateBillInstallmentsDto,
+  CreateRecurringBillsDto,
   UpdateBillDto,
   ListBillsQuery,
   ListBillGroupsQuery,
@@ -442,6 +443,79 @@ export const BillService = {
       action: AuditAction.CREATE,
       entityType: 'BillGroup',
       entityId: result.group.id,
+      after: result,
+    })
+
+    return result
+  },
+
+  async createRecurringBills(companyId: string, data: CreateRecurringBillsDto, req: Request) {
+    const validations: Promise<void>[] = []
+    if (data.supplierId) validations.push(validateSupplierId(companyId, data.supplierId))
+    if (data.accountId) validations.push(validateAccountId(companyId, data.accountId))
+    await Promise.all(validations)
+
+    const dueDates = Array.from({ length: data.months }, (_, index) =>
+      addMonthsClamped(data.firstDueDate, index),
+    )
+
+    const result = await prisma.$transaction(async (tx) => {
+      const created = []
+      const skipped: Array<{ dueDate: Date; reason: 'DUPLICATE'; existingBillId: string }> = []
+
+      for (const dueDate of dueDates) {
+        if (data.skipExisting) {
+          const duplicate = await tx.bill.findFirst({
+            where: {
+              companyId,
+              deletedAt: null,
+              billGroupId: null,
+              description: data.description,
+              supplierId: data.supplierId ?? null,
+              accountId: data.accountId ?? null,
+              amount: data.amount,
+              dueDate,
+              status: { in: ['PENDING', 'OVERDUE'] },
+            },
+            select: { id: true },
+          })
+
+          if (duplicate) {
+            skipped.push({ dueDate, reason: 'DUPLICATE', existingBillId: duplicate.id })
+            continue
+          }
+        }
+
+        const bill = await tx.bill.create({
+          data: {
+            companyId,
+            supplierId: data.supplierId,
+            accountId: data.accountId,
+            description: data.description,
+            amount: data.amount,
+            dueDate,
+            status: 'PENDING',
+            billGroupId: null,
+            installmentNumber: null,
+            installmentCount: null,
+          },
+          select: BILL_SELECT,
+        })
+        created.push(bill)
+      }
+
+      return {
+        created,
+        skipped,
+        countCreated: created.length,
+        countSkipped: skipped.length,
+      }
+    })
+
+    await writeAuditLog(req, {
+      action: AuditAction.CREATE,
+      entityType: 'Bill',
+      entityId: 'recurring-generate',
       after: result,
     })
 

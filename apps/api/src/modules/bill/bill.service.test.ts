@@ -1,7 +1,7 @@
 import type { Request } from 'express'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { BillService } from './bill.service'
-import { createBillInstallmentsSchema } from './bill.schemas'
+import { createBillInstallmentsSchema, createRecurringBillsSchema } from './bill.schemas'
 import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 
 const companyId = 'company-1'
@@ -530,5 +530,255 @@ describe('BillService bill group read model', () => {
     prismaMock.billGroup.findFirst.mockResolvedValue(billGroupWithBills({ bills: [] }))
 
     await expect(BillService.findGroupById(companyId, 'group-1')).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('BillService recurring bill generator', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+  })
+
+  function mockRecurringCreates() {
+    prismaMock.bill.create.mockImplementation(async (args: { data: Record<string, unknown> }) =>
+      bill({
+        id: `bill-${(prismaMock.bill.create.mock.calls.length || 1).toString()}`,
+        billGroupId: null,
+        supplierId: args.data.supplierId ?? null,
+        accountId: args.data.accountId ?? null,
+        description: args.data.description,
+        amount: args.data.amount,
+        dueDate: args.data.dueDate,
+        status: args.data.status,
+        installmentNumber: args.data.installmentNumber ?? null,
+        installmentCount: args.data.installmentCount ?? null,
+      }),
+    )
+  }
+
+  it('gera N Bills PENDING sem alterar saldo, BillGroup ou Expense', async () => {
+    mockSupplier()
+    mockAccount()
+    prismaMock.bill.findFirst.mockResolvedValue(null)
+    mockRecurringCreates()
+
+    const result = await BillService.createRecurringBills(
+      companyId,
+      {
+        supplierId: 'supplier-1',
+        accountId: 'account-1',
+        description: 'Energia eletrica',
+        amount: 700,
+        firstDueDate: new Date('2026-07-15T12:00:00.000Z'),
+        months: 3,
+        skipExisting: true,
+      },
+      req,
+    )
+
+    expect(prismaMock.supplier.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'supplier-1', companyId, deletedAt: null } }),
+    )
+    expect(prismaMock.account.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'account-1', companyId, deletedAt: null, active: true } }),
+    )
+    expect(prismaMock.bill.create).toHaveBeenCalledTimes(3)
+    expect(result.countCreated).toBe(3)
+    expect(result.countSkipped).toBe(0)
+    expect(result.created.every((created) => created.status === 'PENDING')).toBe(true)
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.billGroup.create).not.toHaveBeenCalled()
+    expect(prismaMock.expense.create).not.toHaveBeenCalled()
+  })
+
+  it('usa companyId e cria boletos avulsos sem dados de parcelamento', async () => {
+    prismaMock.bill.findFirst.mockResolvedValue(null)
+    mockRecurringCreates()
+
+    await BillService.createRecurringBills(
+      companyId,
+      {
+        description: 'Internet',
+        amount: 150,
+        firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+        months: 1,
+        skipExisting: true,
+      },
+      req,
+    )
+
+    expect(prismaMock.bill.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          companyId,
+          billGroupId: null,
+          installmentNumber: null,
+          installmentCount: null,
+          status: 'PENDING',
+        }),
+      }),
+    )
+  })
+
+  it('calcula vencimentos mensais e trata dia 31 no ultimo dia do mes', async () => {
+    prismaMock.bill.findFirst.mockResolvedValue(null)
+    mockRecurringCreates()
+
+    await BillService.createRecurringBills(
+      companyId,
+      {
+        description: 'Aluguel',
+        amount: 1000,
+        firstDueDate: new Date('2026-01-31T12:00:00.000Z'),
+        months: 4,
+        skipExisting: true,
+      },
+      req,
+    )
+
+    const dueDates = prismaMock.bill.create.mock.calls.map((call) => call[0].data.dueDate as Date)
+    expect(dueDates.map((date) => date.getUTCDate())).toEqual([31, 28, 31, 30])
+    expect(dueDates.map((date) => date.getUTCMonth())).toEqual([0, 1, 2, 3])
+  })
+
+  it('nao cria duplicados quando skipExisting e retorna skipped', async () => {
+    prismaMock.bill.findFirst
+      .mockResolvedValueOnce({ id: 'existing-bill-1' })
+      .mockResolvedValueOnce(null)
+    mockRecurringCreates()
+
+    const result = await BillService.createRecurringBills(
+      companyId,
+      {
+        description: 'Seguro',
+        amount: 300,
+        firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+        months: 2,
+        skipExisting: true,
+      },
+      req,
+    )
+
+    expect(prismaMock.bill.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          companyId,
+          deletedAt: null,
+          billGroupId: null,
+          description: 'Seguro',
+          supplierId: null,
+          accountId: null,
+          amount: 300,
+          status: { in: ['PENDING', 'OVERDUE'] },
+        }),
+      }),
+    )
+    expect(prismaMock.bill.create).toHaveBeenCalledTimes(1)
+    expect(result.countCreated).toBe(1)
+    expect(result.countSkipped).toBe(1)
+    expect(result.skipped[0]).toMatchObject({
+      reason: 'DUPLICATE',
+      existingBillId: 'existing-bill-1',
+    })
+  })
+
+  it('permite gerar duplicados quando skipExisting e false', async () => {
+    mockRecurringCreates()
+
+    const result = await BillService.createRecurringBills(
+      companyId,
+      {
+        description: 'Sistema',
+        amount: 99,
+        firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+        months: 2,
+        skipExisting: false,
+      },
+      req,
+    )
+
+    expect(prismaMock.bill.findFirst).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).toHaveBeenCalledTimes(2)
+    expect(result.countCreated).toBe(2)
+  })
+
+  it('valida fornecedor e conta da empresa', async () => {
+    prismaMock.supplier.findFirst.mockResolvedValue(null)
+
+    await expect(
+      BillService.createRecurringBills(
+        companyId,
+        {
+          supplierId: 'supplier-other-company',
+          description: 'Contador',
+          amount: 500,
+          firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+          months: 1,
+          skipExisting: true,
+        },
+        req,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
+
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+
+    resetPrismaMock()
+    prismaMock.account.findFirst.mockResolvedValue(null)
+
+    await expect(
+      BillService.createRecurringBills(
+        companyId,
+        {
+          accountId: 'account-other-company',
+          description: 'Contador',
+          amount: 500,
+          firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+          months: 1,
+          skipExisting: true,
+        },
+        req,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('falha com months invalido e amount menor ou igual a zero', () => {
+    expect(
+      createRecurringBillsSchema.safeParse({
+        description: 'Energia',
+        amount: 0,
+        firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+        months: 12,
+      }).success,
+    ).toBe(false)
+
+    expect(
+      createRecurringBillsSchema.safeParse({
+        description: 'Energia',
+        amount: 100,
+        firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+        months: 25,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('usa transaction para evitar criacao parcial em erro inesperado', async () => {
+    prismaMock.bill.findFirst.mockResolvedValue(null)
+    prismaMock.bill.create.mockRejectedValue(new Error('create failed'))
+
+    await expect(
+      BillService.createRecurringBills(
+        companyId,
+        {
+          description: 'Energia',
+          amount: 100,
+          firstDueDate: new Date('2026-07-10T12:00:00.000Z'),
+          months: 2,
+          skipExisting: true,
+        },
+        req,
+      ),
+    ).rejects.toThrow('create failed')
+
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function))
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled()
   })
 })

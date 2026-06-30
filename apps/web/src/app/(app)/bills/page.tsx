@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CalendarPlus } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
@@ -17,7 +19,7 @@ import {
 import { BillForm, type BillFormSubmit } from '@/features/bills/components/bill-form'
 import { BillsTable } from '@/features/bills/components/bills-table'
 import { listSuppliers } from '@/features/suppliers/api'
-import { getApiErrorMessage } from '@/lib/utils'
+import { cn, getApiErrorMessage } from '@/lib/utils'
 import type { Bill } from '@/types/api'
 
 export default function BillsPage() {
@@ -123,6 +125,18 @@ export default function BillsPage() {
         isEmpty={bills.length === 0}
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        action={
+          <Link
+            href="/bills/recurring"
+            className={cn(
+              'inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium',
+              'transition-colors hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Gerar recorrentes
+          </Link>
+        }
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

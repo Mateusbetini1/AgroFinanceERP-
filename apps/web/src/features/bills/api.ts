@@ -24,6 +24,16 @@ export interface BillInstallmentsPayload {
   fileUrl?: string
 }
 
+export interface BillRecurringPayload {
+  supplierId?: string
+  accountId?: string
+  description: string
+  amount: number
+  firstDueDate: string
+  months: number
+  skipExisting?: boolean
+}
+
 export interface BillInstallmentsResult {
   group: {
     id: string
@@ -36,6 +46,17 @@ export interface BillInstallmentsResult {
     updatedAt: string
   }
   bills: Bill[]
+}
+
+export interface BillRecurringResult {
+  created: Bill[]
+  skipped: Array<{
+    dueDate: string
+    reason: 'DUPLICATE'
+    existingBillId: string
+  }>
+  countCreated: number
+  countSkipped: number
 }
 
 function cleanCreateBillPayload(payload: BillPayload): BillPayload {
@@ -97,6 +118,21 @@ function cleanCreateBillInstallmentsPayload(payload: BillInstallmentsPayload): B
   return clean
 }
 
+function cleanCreateBillRecurringPayload(payload: BillRecurringPayload): BillRecurringPayload {
+  const clean: BillRecurringPayload = {
+    description: payload.description,
+    amount: payload.amount,
+    firstDueDate: payload.firstDueDate,
+    months: payload.months,
+    skipExisting: payload.skipExisting ?? true,
+  }
+
+  if (payload.supplierId) clean.supplierId = payload.supplierId
+  if (payload.accountId) clean.accountId = payload.accountId
+
+  return clean
+}
+
 export async function listBills() {
   const { data } = await api.get<PaginatedResponse<Bill>>('/bills')
   return data
@@ -111,6 +147,14 @@ export async function createBillInstallments(payload: BillInstallmentsPayload) {
   const { data } = await api.post<ApiResponse<BillInstallmentsResult>>(
     '/bills/installments',
     cleanCreateBillInstallmentsPayload(payload),
+  )
+  return data.data
+}
+
+export async function createRecurringBills(payload: BillRecurringPayload) {
+  const { data } = await api.post<ApiResponse<BillRecurringResult>>(
+    '/bills/recurring-generate',
+    cleanCreateBillRecurringPayload(payload),
   )
   return data.data
 }

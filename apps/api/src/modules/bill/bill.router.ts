@@ -8,6 +8,7 @@ import { asyncHandler } from '../../shared/utils/async-handler'
 import {
   createBillSchema,
   createBillInstallmentsSchema,
+  createRecurringBillsSchema,
   updateBillSchema,
   listBillsSchema,
   listBillGroupsSchema,
@@ -53,6 +54,17 @@ billRouter.post(
   validate(createBillInstallmentsSchema),
   asyncHandler(async (req, res) => {
     const result = await BillService.createInstallments(req.company!.id, req.body, req)
+    res.status(201).json({ success: true, data: result })
+  }),
+)
+
+// POST /api/v1/bills/recurring-generate
+billRouter.post(
+  '/recurring-generate',
+  financialAccess,
+  validate(createRecurringBillsSchema),
+  asyncHandler(async (req, res) => {
+    const result = await BillService.createRecurringBills(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: result })
   }),
 )
