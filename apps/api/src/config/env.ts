@@ -25,6 +25,16 @@ const envSchema = z.object({
 
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
+
+  // AI assistant
+  AI_ENABLED: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
+  AI_PROVIDER: z.string().default('gemini'),
+  AI_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default('gemini-1.5-flash'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 })
 
 const result = envSchema.safeParse(process.env)

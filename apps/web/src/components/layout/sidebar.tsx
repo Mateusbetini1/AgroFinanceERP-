@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   ArrowLeftRight,
   BarChart3,
+  Bot,
   CalendarClock,
   CreditCard,
   FileText,
@@ -25,6 +26,7 @@ import { cn } from '@/lib/utils'
 
 const enabledItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/assistant', label: 'Assistente', icon: Bot },
   { href: '/cashflow/forecast', label: 'Fluxo Projetado', icon: CalendarClock },
   { href: '/accounts', label: 'Contas', icon: CreditCard },
   { href: '/categories', label: 'Categorias', icon: Tags },
