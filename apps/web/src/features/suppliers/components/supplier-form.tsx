@@ -23,6 +23,7 @@ export function SupplierForm({ initialValue, isSubmitting, onSubmit, onCancel }:
   const [phone, setPhone] = useState('')
   const [contactName, setContactName] = useState('')
   const [notes, setNotes] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setName(initialValue?.name ?? '')
@@ -31,23 +32,49 @@ export function SupplierForm({ initialValue, isSubmitting, onSubmit, onCancel }:
     setPhone(initialValue?.phone ?? '')
     setContactName(initialValue?.contactName ?? '')
     setNotes(initialValue?.notes ?? '')
+    setError(null)
   }, [initialValue])
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const payload: SupplierPayload = {
+      name: name.trim(),
+      document: onlyDigits(document),
+      email: email.trim() ? email.trim() : null,
+      phone: phone.trim() ? onlyDigits(phone) : null,
+      contactName: contactName.trim() ? contactName.trim() : null,
+      notes: notes.trim() ? notes.trim() : null,
+    }
+
+    if (payload.name.length < 2) {
+      setError('Informe o nome do fornecedor com pelo menos 2 caracteres.')
+      return
+    }
+    if (!payload.document) {
+      setError('Informe o CPF ou CNPJ do fornecedor.')
+      return
+    }
+
+    if (
+      initialValue &&
+      payload.name === initialValue.name &&
+      payload.document === initialValue.document &&
+      payload.email === (initialValue.email ?? null) &&
+      payload.phone === (initialValue.phone ?? null) &&
+      payload.contactName === (initialValue.contactName ?? null) &&
+      payload.notes === (initialValue.notes ?? null)
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
+    setError(null)
+    onSubmit(payload)
+  }
+
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit({
-          name,
-          document: onlyDigits(document),
-          email: email.trim() ? email : null,
-          phone: phone.trim() ? onlyDigits(phone) : null,
-          contactName: contactName.trim() ? contactName : null,
-          notes: notes.trim() ? notes : null,
-        })
-      }}
-    >
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="supplier-name">Nome</Label>
@@ -79,6 +106,12 @@ export function SupplierForm({ initialValue, isSubmitting, onSubmit, onCancel }:
         <Label htmlFor="supplier-notes">Observações</Label>
         <Textarea id="supplier-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
       </div>
+
+      {error && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>

@@ -33,7 +33,7 @@ function getFarmLocationErrorMessage(error: unknown, fallback: string) {
     'status' in error.response &&
     error.response.status === 403
   ) {
-    return 'Voce nao tem permissao para alterar locais.'
+    return 'Você não tem permissão para alterar locais.'
   }
 
   return getApiErrorMessage(error, fallback)
@@ -77,7 +77,7 @@ export default function FarmLocationsPage() {
     onError: (error) =>
       setFeedback({
         type: 'error',
-        message: getFarmLocationErrorMessage(error, 'Nao foi possivel criar o local.'),
+        message: getFarmLocationErrorMessage(error, 'Não foi possível criar o local.'),
       }),
   })
 
@@ -93,7 +93,7 @@ export default function FarmLocationsPage() {
     onError: (error) =>
       setFeedback({
         type: 'error',
-        message: getFarmLocationErrorMessage(error, 'Nao foi possivel atualizar o local.'),
+        message: getFarmLocationErrorMessage(error, 'Não foi possível atualizar o local.'),
       }),
   })
 
@@ -109,7 +109,7 @@ export default function FarmLocationsPage() {
         type: 'error',
         message: getFarmLocationErrorMessage(
           error,
-          'Nao foi possivel desativar o local. Verifique se ha safras vinculadas.',
+          'Não foi possível desativar o local. Verifique se há safras vinculadas.',
         ),
       }),
     onSettled: () => setDeactivatingId(null),
@@ -130,7 +130,7 @@ export default function FarmLocationsPage() {
   function handleDeactivate(location: FarmLocation) {
     if (
       !window.confirm(
-        'Desativar local? Ele deixara de aparecer nos selects ativos, mas continuara no historico.',
+        'Desativar local? Ele deixará de aparecer nos selects ativos, mas continuará no histórico.',
       )
     ) {
       return
@@ -147,10 +147,11 @@ export default function FarmLocationsPage() {
     <>
       <ListPage
         title="Locais"
-        description="Locais e areas da fazenda usados em safras e futuros relatorios por area."
+        description="Locais e áreas da fazenda usados em safras e futuros relatórios por área."
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={false}
+        errorMessage="Não foi possível carregar os locais."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
@@ -177,8 +178,8 @@ export default function FarmLocationsPage() {
               >
                 <option value="">Todos</option>
                 <option value="GREENHOUSE">Estufa</option>
-                <option value="PLOT">Talhao</option>
-                <option value="FIELD">Campo/Area</option>
+                <option value="PLOT">Talhão</option>
+                <option value="FIELD">Campo/Área</option>
               </Select>
             </div>
 
@@ -197,7 +198,7 @@ export default function FarmLocationsPage() {
 
           {farmLocations.length === 0 ? (
             <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-              Nenhum local encontrado.
+              {search || type ? 'Nenhum resultado encontrado para os filtros atuais.' : 'Nenhum local cadastrado.'}
             </div>
           ) : (
             <FarmLocationsTable
@@ -213,7 +214,7 @@ export default function FarmLocationsPage() {
       <Dialog
         open={dialogOpen}
         title={editing ? 'Editar local' : 'Novo local'}
-        description="Preencha os dados do local ou area da fazenda."
+        description="Preencha os dados do local ou área da fazenda."
         onClose={() => setDialogOpen(false)}
       >
         {feedback?.type === 'error' && <InlineAlert>{feedback.message}</InlineAlert>}

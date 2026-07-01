@@ -71,7 +71,7 @@ export default function SafrasPage() {
         type: 'error',
         message: getApiErrorMessage(
           error,
-          'Nao foi possivel excluir a safra. Verifique se ha receitas ou despesas vinculadas.',
+          'Não foi possível excluir a safra. Verifique se há receitas, despesas ou boletos vinculados.',
         ),
       }),
     onSettled: () => setDeletingId(null),
@@ -110,6 +110,8 @@ export default function SafrasPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={safras.length === 0}
+        emptyMessage="Nenhuma safra cadastrada."
+        errorMessage="Não foi possível carregar as safras."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
@@ -117,7 +119,7 @@ export default function SafrasPage() {
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
           {hasAuxError && (
             <InlineAlert>
-              Nao foi possivel carregar todos os campos de apoio do formulario. Tente novamente antes de cadastrar.
+              Não foi possível carregar todos os campos de apoio do formulário. Tente novamente antes de cadastrar.
             </InlineAlert>
           )}
           <SafrasTable safras={safras} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />

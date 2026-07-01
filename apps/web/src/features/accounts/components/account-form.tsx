@@ -24,6 +24,7 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
   const [accountNumber, setAccountNumber] = useState('')
   const [initialBalance, setInitialBalance] = useState('0')
   const [active, setActive] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setName(initialValue?.name ?? '')
@@ -33,23 +34,45 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
     setAccountNumber(initialValue?.accountNumber ?? '')
     setInitialBalance(initialValue ? String(initialValue.initialBalance) : '0')
     setActive(initialValue?.active ?? true)
+    setError(null)
   }, [initialValue])
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (name.trim().length < 2) {
+      setError('Informe o nome da conta com pelo menos 2 caracteres.')
+      return
+    }
+
+    const payload: AccountPayload = {
+      name: name.trim(),
+      type,
+      bankName: bankName.trim() ? bankName.trim() : null,
+      agency: agency.trim() ? agency.trim() : null,
+      accountNumber: accountNumber.trim() ? accountNumber.trim() : null,
+      ...(initialValue ? { active } : { initialBalance: Number(initialBalance || 0) }),
+    }
+
+    if (
+      initialValue &&
+      payload.name === initialValue.name &&
+      payload.type === initialValue.type &&
+      payload.bankName === (initialValue.bankName ?? null) &&
+      payload.agency === (initialValue.agency ?? null) &&
+      payload.accountNumber === (initialValue.accountNumber ?? null) &&
+      payload.active === initialValue.active
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
+    setError(null)
+    onSubmit(payload)
+  }
+
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit({
-          name,
-          type,
-          bankName: bankName.trim() ? bankName : null,
-          agency: agency.trim() ? agency : null,
-          accountNumber: accountNumber.trim() ? accountNumber : null,
-          ...(initialValue ? { active } : { initialBalance: Number(initialBalance || 0) }),
-        })
-      }}
-    >
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="account-name">Nome</Label>
@@ -97,6 +120,12 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
           <Checkbox checked={active} onChange={(event) => setActive(event.currentTarget.checked)} />
           Conta ativa
         </label>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <div className="flex justify-end gap-2 pt-2">

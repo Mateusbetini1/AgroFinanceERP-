@@ -12,6 +12,9 @@ interface ListPageProps {
   onRetry: () => void
   onNew?: () => void
   action?: React.ReactNode
+  emptyMessage?: string
+  errorMessage?: string
+  loadingMessage?: string
   children: React.ReactNode
 }
 
@@ -24,6 +27,9 @@ export function ListPage({
   onRetry,
   onNew,
   action,
+  emptyMessage = 'Nenhum registro encontrado.',
+  errorMessage = 'Não foi possível carregar os dados.',
+  loadingMessage = 'Carregando dados...',
   children,
 }: ListPageProps) {
   return (
@@ -46,7 +52,7 @@ export function ListPage({
         <Card>
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Spinner className="h-5 w-5 text-primary" />
-            Carregando dados...
+            {loadingMessage}
           </CardContent>
         </Card>
       )}
@@ -56,7 +62,7 @@ export function ListPage({
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p className="font-medium">Não foi possível carregar os dados.</p>
+              <p className="font-medium">{errorMessage}</p>
             </div>
             <Button type="button" variant="outline" onClick={onRetry}>
               Tentar novamente
@@ -67,7 +73,7 @@ export function ListPage({
 
       {!isLoading && !isError && isEmpty && (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Nenhum registro encontrado.</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground">{emptyMessage}</CardContent>
         </Card>
       )}
 

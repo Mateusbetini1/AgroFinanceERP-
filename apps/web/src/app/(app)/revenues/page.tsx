@@ -101,6 +101,8 @@ export default function RevenuesPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={revenues.length === 0}
+        emptyMessage="Nenhuma receita encontrada."
+        errorMessage="Não foi possível carregar as receitas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

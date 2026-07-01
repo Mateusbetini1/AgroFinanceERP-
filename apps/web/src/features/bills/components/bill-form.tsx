@@ -180,22 +180,43 @@ export function BillForm({ initialValue, suppliers, accounts, categories, safras
 
     const effectivePaidAt = shouldPay ? paidAt || toDateInputValue(new Date()) : paidAt
 
+    const payload: BillPayload = {
+      categoryId: categoryId || null,
+      supplierId: supplierId || null,
+      accountId: accountId || null,
+      safraId: safraId || null,
+      description: description.trim(),
+      amount: parsedAmount,
+      dueDate: dateInputToIso(dueDate)!,
+      paidAt: dateInputToIso(effectivePaidAt),
+      ...(status ? { status } : {}),
+      fileUrl: fileUrl.trim() ? fileUrl.trim() : null,
+      installmentNumber: parsedInstallmentNumber,
+      installmentCount: parsedInstallmentCount,
+    }
+
+    if (
+      initialValue &&
+      payload.categoryId === (initialValue.categoryId ?? null) &&
+      payload.supplierId === (initialValue.supplierId ?? null) &&
+      payload.accountId === (initialValue.accountId ?? null) &&
+      payload.safraId === (initialValue.safraId ?? null) &&
+      payload.description === initialValue.description &&
+      payload.amount === Number(initialValue.amount) &&
+      payload.dueDate === dateInputToIso(toDateInputValue(initialValue.dueDate)) &&
+      payload.paidAt === dateInputToIso(toDateInputValue(initialValue.paidAt)) &&
+      (payload.status ?? initialValue.status) === initialValue.status &&
+      payload.fileUrl === (initialValue.fileUrl ?? null) &&
+      payload.installmentNumber === (initialValue.installmentNumber ?? null) &&
+      payload.installmentCount === (initialValue.installmentCount ?? null)
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
     onSubmit({
       mode: 'single',
-      payload: {
-        categoryId: categoryId || null,
-        supplierId: supplierId || null,
-        accountId: accountId || null,
-        safraId: safraId || null,
-        description: description.trim(),
-        amount: parsedAmount,
-        dueDate: dateInputToIso(dueDate)!,
-        paidAt: dateInputToIso(effectivePaidAt),
-        ...(status ? { status } : {}),
-        fileUrl: fileUrl.trim() ? fileUrl.trim() : null,
-        installmentNumber: parsedInstallmentNumber,
-        installmentCount: parsedInstallmentCount,
-      },
+      payload,
     })
   }
 

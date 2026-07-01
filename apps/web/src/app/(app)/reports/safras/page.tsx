@@ -114,7 +114,9 @@ export default function SafraReportsPage() {
           <Card>
             <CardContent className="p-0">
               {reports.length === 0 ? (
-                <div className="p-6 text-sm text-muted-foreground">Nenhuma safra encontrada para os filtros.</div>
+                <div className="p-6 text-sm text-muted-foreground">
+                  Nenhum lançamento encontrado para os filtros selecionados.
+                </div>
               ) : (
                 <SafraReportTable items={reports} selectedId={selectedSafraId} onSelect={handleSelect} />
               )}

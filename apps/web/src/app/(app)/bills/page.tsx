@@ -129,6 +129,8 @@ export default function BillsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={bills.length === 0}
+        emptyMessage="Nenhum boleto encontrado."
+        errorMessage="Não foi possível carregar os boletos."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
         action={

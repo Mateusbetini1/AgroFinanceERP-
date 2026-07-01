@@ -130,6 +130,16 @@ export function onlyDigits(value: string | null | undefined): string {
 }
 
 export function getApiErrorMessage(error: unknown, fallback = 'Erro inesperado. Tente novamente.'): string {
+  const responseStatus =
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'status' in error.response
+      ? Number(error.response.status)
+      : null
+
   if (
     error &&
     typeof error === 'object' &&
@@ -149,6 +159,12 @@ export function getApiErrorMessage(error: unknown, fallback = 'Erro inesperado. 
       return `${data.message}: ${details}`
     }
     return String(data.message)
+  }
+  if (responseStatus === 403) return 'Você não tem permissão para executar esta ação.'
+  if (responseStatus === 409) return 'Não foi possível concluir a ação porque existem vínculos ou dependências.'
+  if (responseStatus === 422) return 'Verifique os campos informados e tente novamente.'
+  if (responseStatus === null && error && typeof error === 'object' && 'request' in error) {
+    return 'Não foi possível conectar à API. Verifique sua conexão e tente novamente.'
   }
   return fallback
 }

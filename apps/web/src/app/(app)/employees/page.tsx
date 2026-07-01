@@ -60,7 +60,7 @@ export default function EmployeesPage() {
     onMutate: (id) => setDeletingId(id),
     onSuccess: async () => {
       await invalidate(true)
-      setFeedback({ type: 'success', message: 'Funcionário excluído com sucesso.' })
+      setFeedback({ type: 'success', message: 'Funcionário desativado com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
     onSettled: () => setDeletingId(null),
@@ -81,7 +81,7 @@ export default function EmployeesPage() {
   function handleDelete(employee: Employee) {
     if (
       !window.confirm(
-        'Excluir funcionário? Ele será inativado e removido da listagem, mas pagamentos históricos serão mantidos.',
+        'Desativar funcionário? Ele será removido da listagem, mas pagamentos históricos serão mantidos.',
       )
     ) {
       return
@@ -102,6 +102,8 @@ export default function EmployeesPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={employees.length === 0}
+        emptyMessage="Nenhum funcionário cadastrado."
+        errorMessage="Não foi possível carregar os funcionários."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

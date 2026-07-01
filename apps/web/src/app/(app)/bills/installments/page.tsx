@@ -147,7 +147,11 @@ export default function BillInstallmentsPage() {
 
       {!groupsQuery.isLoading && !groupsQuery.isError && groups.length === 0 && (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Nenhum parcelamento encontrado.</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            {search || supplierId || status
+              ? 'Nenhum resultado encontrado para os filtros atuais.'
+              : 'Nenhum parcelamento encontrado.'}
+          </CardContent>
         </Card>
       )}
 

@@ -90,6 +90,8 @@ export default function ProductsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={products.length === 0}
+        emptyMessage="Nenhum produto cadastrado."
+        errorMessage="Não foi possível carregar os produtos."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

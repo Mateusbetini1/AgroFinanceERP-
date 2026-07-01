@@ -90,6 +90,8 @@ export default function CategoriesPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={categories.length === 0}
+        emptyMessage="Nenhuma categoria cadastrada."
+        errorMessage="Não foi possível carregar as categorias."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

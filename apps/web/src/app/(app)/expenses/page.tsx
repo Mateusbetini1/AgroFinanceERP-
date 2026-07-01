@@ -106,6 +106,8 @@ export default function ExpensesPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={expenses.length === 0}
+        emptyMessage="Nenhuma despesa encontrada."
+        errorMessage="Não foi possível carregar as despesas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

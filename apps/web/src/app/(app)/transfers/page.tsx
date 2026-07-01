@@ -93,6 +93,8 @@ export default function TransfersPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={transfers.length === 0}
+        emptyMessage="Nenhuma transferência encontrada."
+        errorMessage="Não foi possível carregar as transferências."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

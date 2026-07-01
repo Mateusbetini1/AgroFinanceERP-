@@ -93,6 +93,8 @@ export default function AccountsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={accounts.length === 0}
+        emptyMessage="Nenhuma conta cadastrada."
+        errorMessage="Não foi possível carregar as contas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

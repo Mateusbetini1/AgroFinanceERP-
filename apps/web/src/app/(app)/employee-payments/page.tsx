@@ -105,6 +105,8 @@ export default function EmployeePaymentsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={payments.length === 0}
+        emptyMessage="Nenhum pagamento de funcionário encontrado."
+        errorMessage="Não foi possível carregar os pagamentos de funcionários."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >

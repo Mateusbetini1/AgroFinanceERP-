@@ -35,6 +35,7 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
   const [unit, setUnit] = useState('KG')
   const [categoryId, setCategoryId] = useState('')
   const [active, setActive] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setName(initialValue?.name ?? '')
@@ -42,22 +43,43 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
     setUnit(initialValue?.unit ?? 'KG')
     setCategoryId(initialValue?.categoryId ?? '')
     setActive(initialValue?.active ?? true)
+    setError(null)
   }, [initialValue])
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (name.trim().length < 2) {
+      setError('Informe o nome do produto com pelo menos 2 caracteres.')
+      return
+    }
+
+    const payload: ProductPayload = {
+      name: name.trim(),
+      description: description.trim() ? description.trim() : null,
+      unit,
+      categoryId: categoryId || null,
+      ...(initialValue ? { active } : {}),
+    }
+
+    if (
+      initialValue &&
+      payload.name === initialValue.name &&
+      payload.description === (initialValue.description ?? null) &&
+      payload.unit === initialValue.unit &&
+      payload.categoryId === (initialValue.categoryId ?? null) &&
+      payload.active === initialValue.active
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
+    setError(null)
+    onSubmit(payload)
+  }
+
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit({
-          name,
-          description: description.trim() ? description : null,
-          unit,
-          categoryId: categoryId || null,
-          ...(initialValue ? { active } : {}),
-        })
-      }}
-    >
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="space-y-2">
         <Label htmlFor="product-name">Nome</Label>
         <Input id="product-name" value={name} onChange={(event) => setName(event.target.value)} required />
@@ -102,6 +124,12 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
           <Checkbox checked={active} onChange={(event) => setActive(event.currentTarget.checked)} />
           Produto ativo
         </label>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <div className="flex justify-end gap-2 pt-2">

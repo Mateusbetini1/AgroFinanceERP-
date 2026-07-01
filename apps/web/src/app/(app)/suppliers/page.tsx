@@ -87,6 +87,8 @@ export default function SuppliersPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={suppliers.length === 0}
+        emptyMessage="Nenhum fornecedor cadastrado."
+        errorMessage="Não foi possível carregar os fornecedores."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
