@@ -24,6 +24,7 @@ export type AssistantMessage = {
 
 export type AssistantChatContext = {
   currentRoute?: string
+  currentDraft?: AssistantDraft
   recentMessages?: Array<{
     role: 'user' | 'assistant'
     content: string

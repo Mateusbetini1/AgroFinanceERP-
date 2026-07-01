@@ -162,9 +162,18 @@ async function findSingleByName<T extends { id: string; name: string }>(
   return matches.length === 1 ? matches[0] : null
 }
 
+function extractSearchAfterKeywords(message: string, keywords: string[]) {
+  const escaped = keywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const match = message.match(new RegExp(`(?:${escaped})\\s+([^,.;]+)`, 'i'))
+  return match?.[1]?.replace(/\b(e|com|para|na|no|da|do)\b.*$/i, '').trim().slice(0, 100) || null
+}
+
 async function resolveCategory(companyId: string, message: string) {
   const normalized = normalizeText(message)
-  const terms = normalized.includes('combustivel')
+  const explicit = extractSearchAfterKeywords(message, ['categoria'])
+  const terms = explicit
+    ? [explicit]
+    : normalized.includes('combustivel')
     ? ['combust']
     : normalized.includes('defensivo')
       ? ['defensivo', 'insumo']
@@ -189,7 +198,7 @@ async function resolveCategory(companyId: string, message: string) {
 async function resolveSafra(companyId: string, message: string) {
   const normalized = normalizeText(message)
   if (!normalized.includes('safra')) return null
-  const search = normalized.includes('cafe') ? 'cafe' : message.split(/safra/i)[1]?.trim()
+  const search = normalized.includes('cafe') ? 'cafe' : extractSearchAfterKeywords(message, ['safra']) ?? message.split(/safra/i)[1]?.trim()
   if (!search) return null
   return findSingleByName(() =>
     prisma.safra.findMany({
@@ -206,7 +215,7 @@ async function resolveSafra(companyId: string, message: string) {
 
 async function resolveEmployee(companyId: string, message: string) {
   const match = message.match(/(?:para|funcion[aá]rio)\s+(?:o\s+|a\s+)?([A-Za-zÀ-ÿ]+)/i)
-  const name = match?.[1]
+  const name = extractSearchAfterKeywords(message, ['funcionario']) ?? match?.[1]
   if (!name) return null
   return findSingleByName(() =>
     prisma.employee.findMany({
@@ -220,6 +229,105 @@ async function resolveEmployee(companyId: string, message: string) {
       take: 2,
     }),
   )
+}
+
+async function resolveAccount(companyId: string, message: string) {
+  const name = extractSearchAfterKeywords(message, ['conta'])
+  if (!name) return null
+  return findSingleByName(() =>
+    prisma.account.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        active: true,
+        name: { contains: name, mode: 'insensitive' as const },
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+async function resolveSupplier(companyId: string, message: string) {
+  const name = extractSearchAfterKeywords(message, ['fornecedor'])
+  if (!name) return null
+  return findSingleByName(() =>
+    prisma.supplier.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        name: { contains: name, mode: 'insensitive' as const },
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+function getRequiredMissingFields(draft: AssistantDraft) {
+  const payload = draft.payload as Record<string, unknown>
+  const missing: string[] = []
+  const hasPositiveAmount = Number(payload.amount) > 0
+
+  if (draft.draftType === 'CREATE_EXPENSE') {
+    if (!payload.description) missing.push('description')
+    if (!hasPositiveAmount) missing.push('amount')
+    if (!payload.date) missing.push('date')
+    if (!payload.status) missing.push('status')
+    if (!payload.categoryId) missing.push('categoryId')
+    if (payload.status === 'PAID' && !payload.accountId) missing.push('accountId')
+    return missing
+  }
+
+  if (draft.draftType === 'CREATE_BILL') {
+    if (!payload.description) missing.push('description')
+    if (!hasPositiveAmount) missing.push('amount')
+    if (!payload.dueDate) missing.push('dueDate')
+    if (payload.status === 'PAID' && !payload.accountId) missing.push('accountId')
+    return missing
+  }
+
+  if (!payload.employeeId) missing.push('employeeId')
+  if (!payload.accountId) missing.push('accountId')
+  if (!payload.type) missing.push('type')
+  if (!hasPositiveAmount) missing.push('amount')
+  if (!payload.date) missing.push('date')
+  if (!Number.isInteger(Number(payload.referenceMonth)) || Number(payload.referenceMonth) < 1 || Number(payload.referenceMonth) > 12) {
+    missing.push('referenceMonth')
+  }
+  if (!Number.isInteger(Number(payload.referenceYear)) || Number(payload.referenceYear) < 2000) missing.push('referenceYear')
+  return missing
+}
+
+function withMissingFields(draft: AssistantDraft): AssistantDraft {
+  return {
+    ...draft,
+    missingFields: [...new Set(getRequiredMissingFields(draft))],
+  } as AssistantDraft
+}
+
+async function completeDraft(companyId: string, input: AssistantChatDto): Promise<AssistantDraft | null> {
+  const currentDraft = input.context?.currentDraft
+  if (!currentDraft || currentDraft.missingFields.length === 0) return null
+
+  const [category, account, supplier, safra, employee] = await Promise.all([
+    resolveCategory(companyId, input.message),
+    resolveAccount(companyId, input.message),
+    resolveSupplier(companyId, input.message),
+    resolveSafra(companyId, input.message),
+    resolveEmployee(companyId, input.message),
+  ])
+
+  const payload = { ...currentDraft.payload } as Record<string, unknown>
+  if (currentDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT') {
+    if (category) payload.categoryId = category.id
+    if (supplier) payload.supplierId = supplier.id
+    if (safra) payload.safraId = safra.id
+  }
+  if (account) payload.accountId = account.id
+  if (currentDraft.draftType === 'CREATE_EMPLOYEE_PAYMENT' && employee) payload.employeeId = employee.id
+
+  return withMissingFields({ ...currentDraft, payload } as AssistantDraft)
 }
 
 async function buildDraft(companyId: string, input: AssistantChatDto): Promise<AssistantDraft | null> {
@@ -371,6 +479,15 @@ function fallbackIntent(input: AssistantChatDto): RoutedIntent {
   if (normalized.includes('receber') || normalized.includes('receita')) return { tool: 'getReceivablesNextDays', args: { days: days ?? 30 } }
   if (normalized.includes('pagar') || normalized.includes('vence')) return { tool: 'getPayablesSummary' }
   return { unsupported: true, reason: 'Eu ainda não consigo consultar isso com precisão nesta versão.' }
+}
+
+function isInstallmentDraftRequest(message: string) {
+  const normalized = normalizeText(message)
+  return (
+    isWriteAction(message) &&
+    (normalized.includes('boleto') || normalized.includes('conta para pagar')) &&
+    (/\b\d+\s*(x|vezes|parcelas?)\b/.test(normalized) || normalized.includes('dividido') || normalized.includes('parcelado'))
+  )
 }
 
 async function callGeminiForTool(input: AssistantChatDto): Promise<AssistantToolCall | null> {
@@ -579,12 +696,62 @@ function buildAnswer(toolCall: AssistantToolCall, data: unknown): string {
   }
 }
 
+async function assertCompanyEntity(
+  label: string,
+  id: unknown,
+  finder: (id: string) => Promise<number>,
+) {
+  if (!id) return
+  const count = await finder(String(id))
+  if (count === 0) throw AppError.badRequest(`${label} nÃ£o pertence Ã  empresa atual ou nÃ£o existe`)
+}
+
+async function validateDraftRelations(companyId: string, draft: AssistantDraft) {
+  const payload = draft.payload as Record<string, unknown>
+
+  await assertCompanyEntity('accountId', payload.accountId, (id) =>
+    prisma.account.count({ where: { id, companyId, deletedAt: null } }),
+  )
+  await assertCompanyEntity('categoryId', payload.categoryId, (id) =>
+    prisma.category.count({ where: { id, companyId, deletedAt: null } }),
+  )
+  await assertCompanyEntity('supplierId', payload.supplierId, (id) =>
+    prisma.supplier.count({ where: { id, companyId, deletedAt: null } }),
+  )
+  await assertCompanyEntity('safraId', payload.safraId, (id) =>
+    prisma.safra.count({ where: { id, companyId, deletedAt: null } }),
+  )
+  await assertCompanyEntity('employeeId', payload.employeeId, (id) =>
+    prisma.employee.count({ where: { id, companyId, deletedAt: null } }),
+  )
+}
+
 export const AssistantService = {
   async chat(companyId: string, input: AssistantChatDto): Promise<AssistantResponse> {
     if (!env.AI_ENABLED || !env.AI_API_KEY) {
       return {
         kind: 'ERROR',
         answer: 'O assistente ainda não está configurado. Configure AI_ENABLED=true e AI_API_KEY no backend.',
+        sources: [],
+      }
+    }
+
+    const completedDraft = await completeDraft(companyId, input)
+    if (completedDraft) {
+      return {
+        kind: 'DRAFT',
+        answer: completedDraft.missingFields.length > 0
+          ? 'Atualizei o rascunho com o que consegui identificar. Ainda faltam campos obrigatÃ³rios.'
+          : 'Atualizei o rascunho. Revise e confirme para salvar.',
+        sources: [],
+        draft: completedDraft,
+      }
+    }
+
+    if (isInstallmentDraftRequest(input.message)) {
+      return {
+        kind: 'NEEDS_CLARIFICATION',
+        answer: 'Ainda nÃ£o consigo criar rascunhos de parcelamento nesta versÃ£o. Posso montar um boleto simples ou vocÃª pode usar a tela de Parcelamentos.',
         sources: [],
       }
     }
@@ -629,10 +796,12 @@ export const AssistantService = {
   },
 
   async confirmDraft(companyId: string, input: ConfirmAssistantDraftDto, req: Request) {
-    const { draft } = input
+    const draft = withMissingFields(input.draft)
     if (draft.missingFields.length > 0) {
       throw AppError.badRequest(`Preencha os campos obrigatórios antes de confirmar: ${draft.missingFields.join(', ')}`)
     }
+
+    await validateDraftRelations(companyId, draft)
 
     if (draft.draftType === 'CREATE_EXPENSE') {
       if (!draft.payload.categoryId) throw AppError.badRequest('categoryId é obrigatório para confirmar despesa')

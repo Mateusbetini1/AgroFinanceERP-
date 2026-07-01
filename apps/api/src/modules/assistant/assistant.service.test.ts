@@ -100,6 +100,50 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.employeePayment.create).not.toHaveBeenCalled()
   })
 
+  it('complementa rascunho aberto com funcionario e conta sem tratar como consulta nova', async () => {
+    prismaMock.employee.findMany.mockResolvedValue([{ id: '22222222-2222-4222-8222-222222222222', name: 'Joao' }])
+    prismaMock.account.findMany.mockResolvedValue([{ id: '33333333-3333-4333-8333-333333333333', name: 'Sicredi' }])
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'funcionario joao e conta sicredi',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_EMPLOYEE_PAYMENT',
+          payload: {
+            type: 'ADVANCE',
+            amount: 500,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            referenceMonth: 7,
+            referenceYear: 2026,
+          },
+          missingFields: ['employeeId', 'accountId'],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload).toEqual(
+      expect.objectContaining({
+        employeeId: '22222222-2222-4222-8222-222222222222',
+        accountId: '33333333-3333-4333-8333-333333333333',
+      }),
+    )
+    expect(result.draft?.missingFields).toEqual([])
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.employeePayment.create).not.toHaveBeenCalled()
+  })
+
+  it('pedido de boleto parcelado nao lista boletos como consulta', async () => {
+    const result = await AssistantService.chat('company-1', { message: 'crie um boleto de 4000 dividido em 4 vezes' })
+
+    expect(result.kind).toBe('NEEDS_CLARIFICATION')
+    expect(result.answer).toContain('rascunhos de parcelamento')
+    expect(result.draft).toBeUndefined()
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
   it('roteia pergunta sobre despesas pendentes para despesas', async () => {
     mockToolData({
       count: 1,

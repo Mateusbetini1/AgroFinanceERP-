@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn, getApiErrorMessage } from '@/lib/utils'
 import { sendAssistantMessage } from '../api'
 import { AssistantDraftCard } from './assistant-draft-card'
-import type { AssistantMessage } from '../types'
+import type { AssistantDraft, AssistantMessage } from '../types'
 
 const suggestions = [
   'O que vence nos próximos 7 dias?',
@@ -36,6 +36,14 @@ function contextFromMessages(messages: AssistantMessage[]) {
     }))
 }
 
+function getOpenDraft(messages: AssistantMessage[]): { messageId: string; draft: AssistantDraft } | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const item = messages[index]
+    if (item.draft?.missingFields.length) return { messageId: item.id, draft: item.draft }
+  }
+  return null
+}
+
 export function AssistantChat() {
   const pathname = usePathname()
   const [message, setMessage] = useState('')
@@ -43,15 +51,37 @@ export function AssistantChat() {
     {
       id: createId(),
       role: 'assistant',
-      content: 'Faça uma pergunta sobre boletos, caixa, receitas, despesas ou safras. Nesta versão eu apenas consulto dados.',
+      content: 'Faça uma pergunta ou peça para montar um rascunho. Nada é salvo sem confirmação.',
       kind: 'ANSWER',
       sources: [],
     },
   ])
 
   const mutation = useMutation({
-    mutationFn: sendAssistantMessage,
-    onSuccess: (response) => {
+    mutationFn: ({
+      draftMessageId: _draftMessageId,
+      ...payload
+    }: {
+      message: string
+      context?: {
+        currentRoute?: string
+        currentDraft?: AssistantDraft
+        recentMessages?: Array<{ role: 'user' | 'assistant'; content: string }>
+      }
+      draftMessageId?: string
+    }) => sendAssistantMessage(payload),
+    onSuccess: (response, variables) => {
+      if (variables.draftMessageId && response.draft) {
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === variables.draftMessageId
+              ? { ...item, content: response.answer, kind: response.kind, sources: response.sources, draft: response.draft }
+              : item,
+          ),
+        )
+        return
+      }
+
       setMessages((current) => [
         ...current,
         {
@@ -85,14 +115,17 @@ export function AssistantChat() {
     if (!content || mutation.isPending) return
 
     const recentMessages = contextFromMessages(messages)
+    const openDraft = getOpenDraft(messages)
     setMessages((current) => [...current, { id: createId(), role: 'user', content }])
     setMessage('')
     mutation.mutate({
       message: content,
       context: {
         currentRoute: pathname,
+        currentDraft: openDraft?.draft,
         recentMessages,
       },
+      draftMessageId: openDraft?.messageId,
     })
   }
 
@@ -111,6 +144,10 @@ export function AssistantChat() {
         sources: [],
       },
     ])
+  }
+
+  function updateDraft(messageId: string, draft: AssistantDraft) {
+    setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, draft } : item)))
   }
 
   return (
@@ -156,6 +193,7 @@ export function AssistantChat() {
                 {item.draft && (
                   <AssistantDraftCard
                     draft={item.draft}
+                    onChange={(draft) => updateDraft(item.id, draft)}
                     onCancel={() => removeDraft(item.id)}
                     onConfirmed={() => markDraftConfirmed(item.id)}
                   />
@@ -187,7 +225,7 @@ export function AssistantChat() {
 
       <aside className="space-y-4">
         <InlineAlert tone="success">
-          O assistente é somente consultivo. Ele não cria, paga, edita ou exclui lançamentos.
+          O assistente monta rascunhos e consulta dados. Nada é salvo sem confirmação.
         </InlineAlert>
         <Card>
           <CardHeader>

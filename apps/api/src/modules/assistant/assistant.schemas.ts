@@ -6,6 +6,7 @@ export const assistantChatSchema = z.object({
   context: z
     .object({
       currentRoute: z.string().trim().max(200).optional(),
+      currentDraft: z.lazy(() => assistantDraftSchema).optional(),
       recentMessages: z
         .array(
           z.object({

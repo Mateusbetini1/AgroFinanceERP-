@@ -21,11 +21,13 @@ import { AssistantService } from './assistant.service'
 import { ExpenseService } from '../expense/expense.service'
 import { BillService } from '../bill/bill.service'
 import { EmployeePaymentService } from '../employee-payment/employee-payment.service'
+import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 
 const req = {} as Parameters<typeof AssistantService.confirmDraft>[2]
 
 describe('AssistantService.confirmDraft', () => {
   beforeEach(() => {
+    resetPrismaMock()
     vi.mocked(ExpenseService.create).mockReset()
     vi.mocked(BillService.create).mockReset()
     vi.mocked(EmployeePaymentService.create).mockReset()
@@ -88,12 +90,14 @@ describe('AssistantService.confirmDraft', () => {
     await expect(
       AssistantService.confirmDraft('company-1', {
         draft: {
-          draftType: 'CREATE_BILL',
+          draftType: 'CREATE_EMPLOYEE_PAYMENT',
           payload: {
-            description: 'Boleto',
-            amount: 1200,
-            dueDate: new Date('2026-07-10T00:00:00.000Z'),
-            status: 'PENDING',
+            employeeId: '22222222-2222-4222-8222-222222222222',
+            type: 'ADVANCE',
+            amount: 500,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            referenceMonth: 7,
+            referenceYear: 2026,
           },
           missingFields: ['accountId'],
           confirmationRequired: true,
@@ -101,6 +105,54 @@ describe('AssistantService.confirmDraft', () => {
       }, req),
     ).rejects.toMatchObject({ statusCode: 400 })
 
-    expect(BillService.create).not.toHaveBeenCalled()
+    expect(EmployeePaymentService.create).not.toHaveBeenCalled()
+  })
+
+  it('recalcula campos obrigatorios antes de confirmar', async () => {
+    await expect(
+      AssistantService.confirmDraft('company-1', {
+        draft: {
+          draftType: 'CREATE_EMPLOYEE_PAYMENT',
+          payload: {
+            employeeId: '22222222-2222-4222-8222-222222222222',
+            type: 'ADVANCE',
+            amount: 500,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            referenceMonth: 7,
+            referenceYear: 2026,
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      }, req),
+    ).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(EmployeePaymentService.create).not.toHaveBeenCalled()
+  })
+
+  it('rejeita entidade de outra empresa antes de criar', async () => {
+    prismaMock.category.count.mockResolvedValue(0)
+
+    await expect(
+      AssistantService.confirmDraft('company-1', {
+        draft: {
+          draftType: 'CREATE_EXPENSE',
+          payload: {
+            description: 'Combustivel',
+            amount: 300,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'PENDING',
+            categoryId: '11111111-1111-4111-8111-111111111111',
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      }, req),
+    ).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(prismaMock.category.count).toHaveBeenCalledWith({
+      where: { id: '11111111-1111-4111-8111-111111111111', companyId: 'company-1', deletedAt: null },
+    })
+    expect(ExpenseService.create).not.toHaveBeenCalled()
   })
 })
