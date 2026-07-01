@@ -11,10 +11,12 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
     env:
+      CI: true
       NODE_ENV: test
       DATABASE_URL: postgresql://user:password@localhost:5432/agrofinance_ci
       JWT_SECRET: ci-jwt-secret-with-at-least-32-characters
       JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
 
     steps:
       - name: Checkout
@@ -34,6 +36,12 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm --filter @agrofinance/database generate
+
+      - name: Build shared
+        run: pnpm --filter @agrofinance/shared build
+
+      - name: Build database
+        run: pnpm --filter @agrofinance/database build
 
       - name: Test API
         run: pnpm --filter api test
