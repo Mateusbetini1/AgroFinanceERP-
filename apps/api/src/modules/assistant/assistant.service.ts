@@ -45,7 +45,12 @@ const WRITE_ACTION_PATTERNS = [
 ]
 
 type RoutedIntent = AssistantToolCall | { unsupported: true; reason: string }
-type DraftIntent = 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT' | 'CREATE_REVENUE'
+type DraftIntent =
+  | 'CREATE_EXPENSE'
+  | 'CREATE_BILL'
+  | 'CREATE_BILL_INSTALLMENT_GROUP'
+  | 'CREATE_EMPLOYEE_PAYMENT'
+  | 'CREATE_REVENUE'
 
 function normalizeText(value: string) {
   return value
@@ -80,6 +85,7 @@ function isRevenueDraftAction(message: string) {
 function getDraftIntent(message: string): DraftIntent | null {
   const normalized = normalizeText(message)
   if (isRevenueDraftAction(message)) return 'CREATE_REVENUE'
+  if (isInstallmentDraftRequest(message)) return 'CREATE_BILL_INSTALLMENT_GROUP'
   if (!isWriteAction(message)) return null
   if (normalized.includes('funcionario') || normalized.includes('vale') || normalized.includes('adiantamento')) {
     return 'CREATE_EMPLOYEE_PAYMENT'
@@ -167,6 +173,22 @@ function extractDueDate(message: string) {
   return makeDate(dayMatch ? Number(dayMatch[1]) : null)
 }
 
+function extractFirstDueDate(message: string) {
+  const normalized = normalizeText(message)
+  if (!normalized.includes('venc') && !normalized.includes('primeira') && !normalized.includes('dia ')) return null
+  return extractDueDate(message)
+}
+
+function extractInstallmentCount(message: string) {
+  const normalized = normalizeText(message)
+  const match =
+    normalized.match(/dividido\s+em\s+(\d+)\s+vezes?/) ??
+    normalized.match(/parcelad[ao]\s+em\s+(\d+)\s+(?:boletos?|parcelas?|vezes?)/) ??
+    normalized.match(/\bem\s+(\d+)\s+(?:boletos?|parcelas?|vezes?)\b/) ??
+    normalized.match(/\b(\d+)\s+(?:boletos?|parcelas?|vezes?)\b/)
+  return match ? Number(match[1]) : null
+}
+
 function descriptionFromMessage(message: string, fallback: string) {
   const cleaned = message
     .replace(/R\$\s*\d[\d.]*(?:,\d{1,2})?/gi, '')
@@ -186,7 +208,11 @@ async function findSingleByName<T extends { id: string; name: string }>(
 function extractSearchAfterKeywords(message: string, keywords: string[]) {
   const escaped = keywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
   const match = message.match(new RegExp(`(?:${escaped})\\s+([^,.;]+)`, 'i'))
-  return match?.[1]?.replace(/\b(e|com|para|na|no|da|do)\b.*$/i, '').trim().slice(0, 100) || null
+  return match?.[1]
+    ?.replace(/\b(categoria|fornecedor|conta|safra|produto|primeira|parcela|vencimento|vencendo|dia)\b.*$/i, '')
+    .replace(/\b(e|com|para|na|no|da|do)\b.*$/i, '')
+    .trim()
+    .slice(0, 100) || null
 }
 
 async function resolveCategory(companyId: string, message: string) {
@@ -336,6 +362,16 @@ function getRequiredMissingFields(draft: AssistantDraft) {
     return missing
   }
 
+  if (draft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
+    if (!payload.description) missing.push('description')
+    if (Number(payload.totalAmount) <= 0) missing.push('totalAmount')
+    if (!Number.isInteger(Number(payload.installmentCount)) || Number(payload.installmentCount) < 2) {
+      missing.push('installmentCount')
+    }
+    if (!payload.firstDueDate) missing.push('firstDueDate')
+    return missing
+  }
+
   if (draft.draftType === 'CREATE_REVENUE') {
     if (!hasPositiveAmount) missing.push('amount')
     if (!payload.date) missing.push('date')
@@ -386,6 +422,10 @@ async function completeDraft(companyId: string, input: AssistantChatDto): Promis
   if (account) payload.accountId = account.id
   if (currentDraft.draftType === 'CREATE_EMPLOYEE_PAYMENT' && employee) payload.employeeId = employee.id
   if (currentDraft.draftType === 'CREATE_REVENUE' && product) payload.productId = product.id
+  if (currentDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
+    const firstDueDate = extractFirstDueDate(input.message)
+    if (firstDueDate) payload.firstDueDate = firstDueDate
+  }
 
   return withMissingFields({ ...currentDraft, payload } as AssistantDraft)
 }
@@ -438,6 +478,35 @@ async function buildDraft(companyId: string, input: AssistantChatDto): Promise<A
         status: 'PENDING',
         categoryId: category?.id,
         safraId: safra?.id,
+      },
+      missingFields: [...new Set(missingFields)],
+      confirmationRequired: true,
+    }
+  }
+
+  if (intent === 'CREATE_BILL_INSTALLMENT_GROUP') {
+    const category = await resolveCategory(companyId, input.message)
+    const supplier = await resolveSupplier(companyId, input.message)
+    const safra = await resolveSafra(companyId, input.message)
+    const account = await resolveAccount(companyId, input.message)
+    const installmentCount = extractInstallmentCount(input.message)
+    const firstDueDate = extractFirstDueDate(input.message)
+    if (!installmentCount || installmentCount < 2) missingFields.push('installmentCount')
+    if (!firstDueDate) missingFields.push('firstDueDate')
+
+    return {
+      draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+      payload: {
+        description: descriptionFromMessage(input.message, 'Parcelamento de boleto'),
+        totalAmount: amount ?? 0,
+        installmentCount: installmentCount ?? 0,
+        firstDueDate: firstDueDate ?? undefined,
+        interval: 'MONTHLY',
+        categoryId: category?.id,
+        supplierId: supplier?.id,
+        accountId: account?.id,
+        safraId: safra?.id,
+        notes: descriptionFromMessage(input.message, 'Parcelamento de boleto'),
       },
       missingFields: [...new Set(missingFields)],
       confirmationRequired: true,
@@ -577,9 +646,10 @@ function fallbackIntent(input: AssistantChatDto): RoutedIntent {
 
 function isInstallmentDraftRequest(message: string) {
   const normalized = normalizeText(message)
+  if (/^\s*(quais|qual|quanto|quantos)\b/i.test(normalized)) return false
   return (
-    isWriteAction(message) &&
-    (normalized.includes('boleto') || normalized.includes('conta para pagar')) &&
+    (isWriteAction(message) || normalized.includes('tenho uma compra') || normalized.includes('comprei') || normalized.includes('parcelamento')) &&
+    (normalized.includes('boleto') || normalized.includes('boletos') || normalized.includes('compra') || normalized.includes('comprei') || normalized.includes('parcelamento')) &&
     (/\b\d+\s*(x|vezes|parcelas?)\b/.test(normalized) || normalized.includes('dividido') || normalized.includes('parcelado'))
   )
 }
@@ -845,14 +915,6 @@ export const AssistantService = {
       }
     }
 
-    if (isInstallmentDraftRequest(input.message)) {
-      return {
-        kind: 'NEEDS_CLARIFICATION',
-        answer: 'Ainda nÃ£o consigo criar rascunhos de parcelamento nesta versÃ£o. Posso montar um boleto simples ou vocÃª pode usar a tela de Parcelamentos.',
-        sources: [],
-      }
-    }
-
     const draft = await buildDraft(companyId, input)
     if (draft) {
       return {
@@ -912,6 +974,23 @@ export const AssistantService = {
       return {
         draftType: draft.draftType,
         created: await BillService.create(companyId, draft.payload, req),
+      }
+    }
+
+    if (draft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
+      if (!draft.payload.firstDueDate) throw AppError.badRequest('firstDueDate é obrigatório para confirmar parcelamento')
+      return {
+        draftType: draft.draftType,
+        created: await BillService.createInstallments(companyId, {
+          categoryId: draft.payload.categoryId,
+          supplierId: draft.payload.supplierId,
+          accountId: draft.payload.accountId,
+          safraId: draft.payload.safraId,
+          description: draft.payload.description,
+          totalAmount: draft.payload.totalAmount,
+          installmentCount: draft.payload.installmentCount,
+          firstDueDate: draft.payload.firstDueDate,
+        }, req),
       }
     }
 

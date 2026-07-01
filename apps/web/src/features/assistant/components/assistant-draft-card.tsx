@@ -14,7 +14,7 @@ import { listActiveEmployees } from '@/features/employees/api'
 import { listProducts } from '@/features/products/api'
 import { listSafras } from '@/features/safras/api'
 import { listSuppliers } from '@/features/suppliers/api'
-import { dateInputToIso, formatCurrency, formatPaymentType, getApiErrorMessage, toDateInputValue } from '@/lib/utils'
+import { dateInputToIso, formatCurrency, formatDate, formatPaymentType, getApiErrorMessage, toDateInputValue } from '@/lib/utils'
 import { confirmAssistantDraft } from '../api'
 import type { AssistantDraft } from '../types'
 import type { Account, Category, PaymentType } from '@/types/api'
@@ -24,6 +24,7 @@ type DraftPayload = Record<string, unknown>
 const draftLabels: Record<AssistantDraft['draftType'], string> = {
   CREATE_EXPENSE: 'Despesa',
   CREATE_BILL: 'Boleto',
+  CREATE_BILL_INSTALLMENT_GROUP: 'Parcelamento de boleto',
   CREATE_EMPLOYEE_PAYMENT: 'Pagamento de funcionário',
   CREATE_REVENUE: 'Receita',
 }
@@ -31,6 +32,10 @@ const draftLabels: Record<AssistantDraft['draftType'], string> = {
 const fieldLabels: Record<string, string> = {
   description: 'Descrição',
   amount: 'Valor',
+  totalAmount: 'Valor total',
+  installmentCount: 'Quantidade de parcelas',
+  firstDueDate: 'Primeiro vencimento',
+  interval: 'Intervalo',
   date: 'Data',
   paymentDate: 'Data',
   dueDate: 'Vencimento',
@@ -56,6 +61,31 @@ function optionLabel(account: Account) {
 
 function isExpenseCategory(category: Category) {
   return category.active && (category.type === 'EXPENSE' || category.type === 'BOTH')
+}
+
+function distributeInstallmentAmounts(totalAmount: number, installmentCount: number): number[] {
+  const totalCents = Math.round(totalAmount * 100)
+  const baseCents = Math.floor(totalCents / installmentCount)
+  const remainderCents = totalCents % installmentCount
+
+  return Array.from({ length: installmentCount }, (_, index) => {
+    const cents = baseCents + (index === installmentCount - 1 ? remainderCents : 0)
+    return cents / 100
+  })
+}
+
+function parseDateInput(value: string): Date | null {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day, 12)
+}
+
+function addMonthsClamped(date: Date, months: number): Date {
+  const targetYear = date.getFullYear()
+  const targetMonth = date.getMonth() + months
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate()
+  const targetDay = Math.min(date.getDate(), lastDayOfTargetMonth)
+  return new Date(targetYear, targetMonth, targetDay, 12)
 }
 
 function payloadValue(payload: DraftPayload, key: string) {
@@ -93,6 +123,16 @@ function recalculateMissingFields(draft: AssistantDraft) {
     return missing
   }
 
+  if (draft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
+    if (!payload.description) missing.push('description')
+    if (Number(payload.totalAmount) <= 0) missing.push('totalAmount')
+    if (!Number.isInteger(Number(payload.installmentCount)) || Number(payload.installmentCount) < 2) {
+      missing.push('installmentCount')
+    }
+    if (!payload.firstDueDate) missing.push('firstDueDate')
+    return missing
+  }
+
   if (draft.draftType === 'CREATE_REVENUE') {
     if (!Number.isFinite(amount) || amount <= 0) missing.push('amount')
     if (!payload.date) missing.push('date')
@@ -116,8 +156,10 @@ function recalculateMissingFields(draft: AssistantDraft) {
 
 function normalizePayloadValue(key: string, value: string) {
   if (value === '') return undefined
-  if (key === 'amount' || key === 'referenceMonth' || key === 'referenceYear') return Number(value)
-  if (key === 'date' || key === 'dueDate' || key === 'receivedAt') return dateInputToIso(value)
+  if (key === 'amount' || key === 'totalAmount' || key === 'installmentCount' || key === 'referenceMonth' || key === 'referenceYear') {
+    return Number(value)
+  }
+  if (key === 'date' || key === 'dueDate' || key === 'receivedAt' || key === 'firstDueDate') return dateInputToIso(value)
   return value
 }
 
@@ -154,6 +196,21 @@ export function AssistantDraftCard({
   const safras = useMemo(() => (safrasQuery.data?.data ?? []).filter((safra) => safra.active), [safrasQuery.data?.data])
   const employees = employeesQuery.data?.data ?? []
   const products = useMemo(() => (productsQuery.data?.data ?? []).filter((product) => product.active), [productsQuery.data?.data])
+
+  const installmentPreview = useMemo(() => {
+    if (editableDraft.draftType !== 'CREATE_BILL_INSTALLMENT_GROUP') return []
+    const total = Number(editableDraft.payload.totalAmount)
+    const count = Number(editableDraft.payload.installmentCount)
+    const firstDueDate = parseDateInput(toDateInputValue(editableDraft.payload.firstDueDate as string | Date | null | undefined))
+
+    if (!Number.isFinite(total) || total <= 0 || !Number.isInteger(count) || count < 2 || !firstDueDate) return []
+
+    return distributeInstallmentAmounts(total, count).map((amount, index) => ({
+      number: index + 1,
+      amount,
+      dueDate: addMonthsClamped(firstDueDate, index),
+    }))
+  }, [editableDraft])
 
   const mutation = useMutation({
     mutationFn: () => confirmAssistantDraft(editableDraft),
@@ -211,7 +268,9 @@ export function AssistantDraftCard({
           </div>
         )}
 
-        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_BILL') && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' ||
+          editableDraft.draftType === 'CREATE_BILL' ||
+          editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-category">{fieldLabels.categoryId}</Label>
             <Select
@@ -265,17 +324,45 @@ export function AssistantDraftCard({
           </div>
         )}
 
-        <div className="space-y-1">
-          <Label htmlFor="assistant-draft-amount">{fieldLabels.amount}</Label>
-          <Input
-            id="assistant-draft-amount"
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={payloadNumber(editableDraft.payload, 'amount')}
-            onChange={(event) => patchPayload('amount', event.target.value)}
-          />
-        </div>
+        {editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP' ? (
+          <>
+            <div className="space-y-1">
+              <Label htmlFor="assistant-draft-total-amount">{fieldLabels.totalAmount}</Label>
+              <Input
+                id="assistant-draft-total-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={payloadNumber(editableDraft.payload, 'totalAmount')}
+                onChange={(event) => patchPayload('totalAmount', event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="assistant-draft-installment-count">{fieldLabels.installmentCount}</Label>
+              <Input
+                id="assistant-draft-installment-count"
+                type="number"
+                min="2"
+                step="1"
+                value={payloadNumber(editableDraft.payload, 'installmentCount')}
+                onChange={(event) => patchPayload('installmentCount', event.target.value)}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="space-y-1">
+            <Label htmlFor="assistant-draft-amount">{fieldLabels.amount}</Label>
+            <Input
+              id="assistant-draft-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={payloadNumber(editableDraft.payload, 'amount')}
+              onChange={(event) => patchPayload('amount', event.target.value)}
+            />
+          </div>
+        )}
 
         {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_REVENUE') && (
           <div className="space-y-1">
@@ -301,7 +388,7 @@ export function AssistantDraftCard({
           </div>
         )}
 
-        {editableDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT' && (
+        {editableDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT' && editableDraft.draftType !== 'CREATE_BILL_INSTALLMENT_GROUP' && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-due-date">{fieldLabels.dueDate}</Label>
             <Input
@@ -309,6 +396,18 @@ export function AssistantDraftCard({
               type="date"
               value={toDateInputValue(editableDraft.payload.dueDate as string | Date | null | undefined)}
               onChange={(event) => patchPayload('dueDate', event.target.value)}
+            />
+          </div>
+        )}
+
+        {editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP' && (
+          <div className="space-y-1">
+            <Label htmlFor="assistant-draft-first-due-date">{fieldLabels.firstDueDate}</Label>
+            <Input
+              id="assistant-draft-first-due-date"
+              type="date"
+              value={toDateInputValue(editableDraft.payload.firstDueDate as string | Date | null | undefined)}
+              onChange={(event) => patchPayload('firstDueDate', event.target.value)}
             />
           </div>
         )}
@@ -371,7 +470,9 @@ export function AssistantDraftCard({
           </Select>
         </div>
 
-        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_BILL') && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' ||
+          editableDraft.draftType === 'CREATE_BILL' ||
+          editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-supplier">{fieldLabels.supplierId}</Label>
             <Select
@@ -456,11 +557,11 @@ export function AssistantDraftCard({
           </>
         )}
 
-        {editableDraft.draftType === 'CREATE_REVENUE' && (
+        {(editableDraft.draftType === 'CREATE_REVENUE' || editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') && (
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="assistant-draft-revenue-notes">{fieldLabels.notes}</Label>
+            <Label htmlFor="assistant-draft-notes-extra">{fieldLabels.notes}</Label>
             <Textarea
-              id="assistant-draft-revenue-notes"
+              id="assistant-draft-notes-extra"
               value={payloadValue(editableDraft.payload, 'notes')}
               onChange={(event) => patchPayload('notes', event.target.value)}
             />
@@ -475,6 +576,21 @@ export function AssistantDraftCard({
             {editableDraft.payload.referenceMonth ? String(editableDraft.payload.referenceMonth).padStart(2, '0') : 'Não informado'}
           </span>
           <span>{fieldLabels.referenceYear}: {editableDraft.payload.referenceYear ? String(editableDraft.payload.referenceYear) : 'Não informado'}</span>
+        </div>
+      )}
+
+      {editableDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP' && installmentPreview.length > 0 && (
+        <div className="mt-3 rounded-md border">
+          <div className="border-b px-3 py-2 text-xs font-medium">Prévia das parcelas</div>
+          <div className="divide-y">
+            {installmentPreview.map((installment) => (
+              <div key={installment.number} className="grid grid-cols-3 gap-2 px-3 py-2 text-xs">
+                <span>Parcela {installment.number}</span>
+                <span>{formatDate(installment.dueDate)}</span>
+                <span className="text-right font-medium">{formatCurrency(installment.amount)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

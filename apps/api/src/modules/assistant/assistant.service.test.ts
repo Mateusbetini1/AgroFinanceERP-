@@ -82,6 +82,27 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.bill.create).not.toHaveBeenCalled()
   })
 
+  it('chat gera CREATE_BILL_INSTALLMENT_GROUP sem salvar', async () => {
+    const result = await AssistantService.chat('company-1', { message: 'Crie um boleto de R$ 4000 dividido em 4 vezes.' })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft).toEqual(
+      expect.objectContaining({
+        draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+        payload: expect.objectContaining({
+          totalAmount: 4000,
+          installmentCount: 4,
+          interval: 'MONTHLY',
+        }),
+        missingFields: expect.arrayContaining(['firstDueDate']),
+        confirmationRequired: true,
+      }),
+    )
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.billGroup.create).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
   it('chat gera CREATE_EMPLOYEE_PAYMENT_DRAFT sem salvar', async () => {
     prismaMock.employee.findMany.mockResolvedValue([{ id: '22222222-2222-4222-8222-222222222222', name: 'João' }])
 
@@ -223,12 +244,35 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.revenue.create).not.toHaveBeenCalled()
   })
 
-  it('pedido de boleto parcelado nao lista boletos como consulta', async () => {
-    const result = await AssistantService.chat('company-1', { message: 'crie um boleto de 4000 dividido em 4 vezes' })
+  it('complementa rascunho aberto de parcelamento', async () => {
+    prismaMock.supplier.findMany.mockResolvedValue([{ id: '55555555-5555-4555-8555-555555555555', name: 'Casa Agricola' }])
+    prismaMock.category.findMany.mockResolvedValue([{ id: '11111111-1111-4111-8111-111111111111', name: 'Defensivos' }])
 
-    expect(result.kind).toBe('NEEDS_CLARIFICATION')
-    expect(result.answer).toContain('rascunhos de parcelamento')
-    expect(result.draft).toBeUndefined()
+    const result = await AssistantService.chat('company-1', {
+      message: 'fornecedor Casa Agricola categoria defensivos primeira parcela dia 10',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+          payload: {
+            description: 'Compra parcelada',
+            totalAmount: 4000,
+            installmentCount: 4,
+            interval: 'MONTHLY',
+          },
+          missingFields: ['firstDueDate'],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload).toEqual(
+      expect.objectContaining({
+        supplierId: '55555555-5555-4555-8555-555555555555',
+        categoryId: '11111111-1111-4111-8111-111111111111',
+      }),
+    )
+    expect(result.draft?.payload).toHaveProperty('firstDueDate')
     expect(executeAssistantTool).not.toHaveBeenCalled()
     expect(prismaMock.bill.create).not.toHaveBeenCalled()
   })
@@ -304,6 +348,14 @@ describe('AssistantService.chat', () => {
 
   it('roteia boletos pendentes', async () => {
     await AssistantService.chat('company-1', { message: 'Quais boletos pendentes eu tenho?' })
+    expectTool('company-1', 'getPendingBills')
+  })
+
+  it('pergunta sobre boletos parcelados continua consulta', async () => {
+    const result = await AssistantService.chat('company-1', { message: 'Quais boletos parcelados eu tenho?' })
+
+    expect(result.kind).toBe('ANSWER')
+    expect(result.draft).toBeUndefined()
     expectTool('company-1', 'getPendingBills')
   })
 

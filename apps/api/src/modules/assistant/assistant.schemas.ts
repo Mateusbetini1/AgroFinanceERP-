@@ -46,6 +46,19 @@ const billDraftPayloadSchema = z.object({
   safraId: optionalUuid,
 })
 
+const billInstallmentGroupDraftPayloadSchema = z.object({
+  description: z.string().min(1).max(500),
+  totalAmount: z.number().positive(),
+  installmentCount: z.number().int().min(2),
+  firstDueDate: z.coerce.date().optional(),
+  interval: z.literal('MONTHLY').default('MONTHLY'),
+  categoryId: optionalUuid,
+  supplierId: optionalUuid,
+  accountId: optionalUuid,
+  safraId: optionalUuid,
+  notes: z.string().max(1000).optional(),
+})
+
 const employeePaymentDraftPayloadSchema = z.object({
   employeeId: uuidSchema.optional(),
   accountId: optionalUuid,
@@ -83,6 +96,12 @@ export const assistantDraftSchema = z.discriminatedUnion('draftType', [
   z.object({
     draftType: z.literal('CREATE_BILL'),
     payload: billDraftPayloadSchema,
+    missingFields: z.array(z.string()),
+    confirmationRequired: z.literal(true),
+  }),
+  z.object({
+    draftType: z.literal('CREATE_BILL_INSTALLMENT_GROUP'),
+    payload: billInstallmentGroupDraftPayloadSchema,
     missingFields: z.array(z.string()),
     confirmationRequired: z.literal(true),
   }),

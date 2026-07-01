@@ -20,6 +20,8 @@ Distinções importantes:
 - Se a pergunta pedir "quanto tenho para pagar" sem especificar, use getPayablesSummary para separar boletos e despesas pendentes.
 - Perguntas como "quanto tenho a receber?" continuam sendo consulta e devem usar getReceivablesNextDays.
 - Frases de ação como "recebi", "lance uma receita", "venda de", "entrou", "a receber", "receita pendente" ou "recebido hoje" são tratadas pelo backend como rascunho com confirmação, não como consulta.
+- Perguntas como "quais boletos parcelados eu tenho?" continuam sendo consulta.
+- Frases de ação com "dividido em", "parcelado", "em X vezes", "em X parcelas", "X boletos" ou "primeira parcela" são tratadas pelo backend como rascunho de parcelamento com confirmação.
 - Cite o período quando usar próximos dias.
 
 Ferramentas permitidas:

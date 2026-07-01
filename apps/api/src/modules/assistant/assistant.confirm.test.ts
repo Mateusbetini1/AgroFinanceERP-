@@ -10,7 +10,7 @@ vi.mock('../expense/expense.service', () => ({
 }))
 
 vi.mock('../bill/bill.service', () => ({
-  BillService: { create: vi.fn() },
+  BillService: { create: vi.fn(), createInstallments: vi.fn() },
 }))
 
 vi.mock('../employee-payment/employee-payment.service', () => ({
@@ -35,6 +35,7 @@ describe('AssistantService.confirmDraft', () => {
     resetPrismaMock()
     vi.mocked(ExpenseService.create).mockReset()
     vi.mocked(BillService.create).mockReset()
+    vi.mocked(BillService.createInstallments).mockReset()
     vi.mocked(EmployeePaymentService.create).mockReset()
     vi.mocked(RevenueService.create).mockReset()
   })
@@ -70,6 +71,34 @@ describe('AssistantService.confirmDraft', () => {
     }, req)
 
     expect(BillService.create).toHaveBeenCalledWith('company-1', payload, req)
+  })
+
+  it('confirmacao cria parcelamento usando companyId correto', async () => {
+    vi.mocked(BillService.createInstallments).mockResolvedValue({ group: { id: 'group-1' }, bills: [] })
+    const payload = {
+      description: 'Compra parcelada',
+      totalAmount: 4000,
+      installmentCount: 4,
+      firstDueDate: new Date('2026-07-10T00:00:00.000Z'),
+      interval: 'MONTHLY' as const,
+      supplierId: '55555555-5555-4555-8555-555555555555',
+      categoryId: '11111111-1111-4111-8111-111111111111',
+    }
+
+    await AssistantService.confirmDraft('company-1', {
+      draft: { draftType: 'CREATE_BILL_INSTALLMENT_GROUP', payload, missingFields: [], confirmationRequired: true },
+    }, req)
+
+    expect(BillService.createInstallments).toHaveBeenCalledWith('company-1', {
+      categoryId: payload.categoryId,
+      supplierId: payload.supplierId,
+      accountId: undefined,
+      safraId: undefined,
+      description: payload.description,
+      totalAmount: 4000,
+      installmentCount: 4,
+      firstDueDate: payload.firstDueDate,
+    }, req)
   })
 
   it('confirmacao cria pagamento de funcionario usando companyId correto', async () => {
@@ -190,6 +219,26 @@ describe('AssistantService.confirmDraft', () => {
     ).rejects.toMatchObject({ statusCode: 400 })
 
     expect(RevenueService.create).not.toHaveBeenCalled()
+  })
+
+  it('nao confirma parcelamento sem primeiro vencimento', async () => {
+    await expect(
+      AssistantService.confirmDraft('company-1', {
+        draft: {
+          draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+          payload: {
+            description: 'Compra parcelada',
+            totalAmount: 4000,
+            installmentCount: 4,
+            interval: 'MONTHLY',
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      }, req),
+    ).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(BillService.createInstallments).not.toHaveBeenCalled()
   })
 
   it('rejeita entidade de outra empresa antes de criar', async () => {
