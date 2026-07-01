@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { getDashboardLive, getDashboardMonthly } from '@/features/dashboard/api'
 import { FinancialPositionSection } from '@/features/dashboard/components/financial-position-section'
+import { MobileDashboardHome } from '@/features/dashboard/components/mobile-dashboard-home'
 import { formatCurrency, formatEmployeeType } from '@/lib/utils'
 
 type KpiTone = 'default' | 'positive' | 'negative' | 'warning'
@@ -144,12 +145,22 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <FinancialPositionSection
-        data={liveQuery.data}
-        isLoading={liveQuery.isLoading}
-        isError={liveQuery.isError}
-        onRetry={() => void liveQuery.refetch()}
+      <MobileDashboardHome
+        live={liveQuery.data}
+        monthly={query.data}
+        isLiveLoading={liveQuery.isLoading}
+        isLiveError={liveQuery.isError}
+        onRetryLive={() => void liveQuery.refetch()}
       />
+
+      <div className="hidden lg:block">
+        <FinancialPositionSection
+          data={liveQuery.data}
+          isLoading={liveQuery.isLoading}
+          isError={liveQuery.isError}
+          onRetry={() => void liveQuery.refetch()}
+        />
+      </div>
 
       <div>
         <h2 className="text-xl font-semibold tracking-normal text-foreground">Visão mensal</h2>
