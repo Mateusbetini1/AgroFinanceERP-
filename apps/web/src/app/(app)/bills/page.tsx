@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarPlus } from 'lucide-react'
+import { CalendarPlus, ListChecks, Plus } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
@@ -123,7 +123,8 @@ export default function BillsPage() {
 
   return (
     <>
-      <ListPage
+      <div className="[&>div>div:first-child>div:last-child]:hidden md:[&>div>div:first-child>div:last-child]:flex">
+        <ListPage
         title="Boletos"
         description="Contas individuais a pagar, pendentes, pagas ou vencidas."
         isLoading={query.isLoading}
@@ -147,6 +148,39 @@ export default function BillsPage() {
         }
       >
         <div className="space-y-4">
+          <div className="grid gap-2 md:hidden">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={openCreate}
+            >
+              <Plus className="h-4 w-4" />
+              Novo boleto
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/bills/installments"
+                className={cn(
+                  'inline-flex h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium',
+                  'transition-colors hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <ListChecks className="h-4 w-4" />
+                Parcelamentos
+              </Link>
+              <Link
+                href="/bills/recurring"
+                className={cn(
+                  'inline-flex h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium',
+                  'transition-colors hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <CalendarPlus className="h-4 w-4" />
+                Recorrentes
+              </Link>
+            </div>
+          </div>
+
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
           {hasAuxError && (
             <InlineAlert>
@@ -155,7 +189,8 @@ export default function BillsPage() {
           )}
           <BillsTable bills={bills} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
         </div>
-      </ListPage>
+        </ListPage>
+      </div>
 
       <Dialog
         open={dialogOpen}
