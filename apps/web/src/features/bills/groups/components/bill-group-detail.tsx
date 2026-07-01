@@ -12,6 +12,61 @@ function statusVariant(status: string) {
   return 'warning'
 }
 
+function InstallmentMobileCard({ installment }: { installment: BillGroupInstallment }) {
+  const installmentLabel =
+    installment.installmentNumber && installment.installmentCount
+      ? `${installment.installmentNumber}/${installment.installmentCount}`
+      : 'Parcela'
+
+  return (
+    <div className="space-y-3 rounded-lg border bg-card p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{installmentLabel}</p>
+          <p className="mt-1 break-words text-xs text-muted-foreground">{installment.description}</p>
+        </div>
+        <Badge variant={statusVariant(installment.status)} className="shrink-0">
+          {formatStatusLabel(installment.status)}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto] gap-3 rounded-md border bg-muted/30 p-3">
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Valor</p>
+          <p className="mt-1 text-lg font-semibold">{formatCurrency(installment.amount)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs font-medium uppercase text-muted-foreground">Vencimento</p>
+          <p className="mt-1 text-sm font-semibold">{formatDate(installment.dueDate)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Pagamento</p>
+          <p className="mt-1">{formatDate(installment.paidAt)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Conta</p>
+          <p className="mt-1">{installment.account?.name ?? '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Categoria</p>
+          <p className="mt-1">{installment.category?.name ?? '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Safra</p>
+          <p className="mt-1">{installment.safra?.name ?? '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Fornecedor</p>
+          <p className="mt-1">{installment.supplier?.name ?? '-'}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function BillGroupDetailPanel({ detail }: { detail: BillGroupDetail }) {
   const columns: DataTableColumn<BillGroupInstallment>[] = [
     {
@@ -60,7 +115,12 @@ export function BillGroupDetailPanel({ detail }: { detail: BillGroupDetail }) {
           </Link>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={detail.installments} getRowKey={(installment) => installment.id} />
+          <DataTable
+            columns={columns}
+            data={detail.installments}
+            getRowKey={(installment) => installment.id}
+            mobileCard={(installment) => <InstallmentMobileCard installment={installment} />}
+          />
         </CardContent>
       </Card>
     </div>
