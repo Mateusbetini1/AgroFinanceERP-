@@ -100,6 +100,60 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.employeePayment.create).not.toHaveBeenCalled()
   })
 
+  it('chat gera CREATE_REVENUE_DRAFT sem salvar', async () => {
+    prismaMock.product.findMany.mockResolvedValue([{ id: '44444444-4444-4444-8444-444444444444', name: 'Cafe' }])
+
+    const result = await AssistantService.chat('company-1', { message: 'Recebi R$ 1.750 de venda de cafe.' })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.answer).toContain('rascunho de receita')
+    expect(result.draft).toEqual(
+      expect.objectContaining({
+        draftType: 'CREATE_REVENUE',
+        payload: expect.objectContaining({
+          amount: 1750,
+          quantity: 1,
+          unitPrice: 1750,
+          status: 'RECEIVED',
+          productId: '44444444-4444-4444-8444-444444444444',
+        }),
+        missingFields: expect.arrayContaining(['accountId']),
+        confirmationRequired: true,
+      }),
+    )
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.revenue.create).not.toHaveBeenCalled()
+  })
+
+  it('frase recebida no caixa gera draft RECEIVED', async () => {
+    prismaMock.account.findMany.mockResolvedValue([{ id: '33333333-3333-4333-8333-333333333333', name: 'Caixa' }])
+
+    const result = await AssistantService.chat('company-1', { message: 'Recebi R$ 800 no caixa.' })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.draftType).toBe('CREATE_REVENUE')
+    expect(result.draft?.payload).toEqual(
+      expect.objectContaining({
+        amount: 800,
+        status: 'RECEIVED',
+        accountId: '33333333-3333-4333-8333-333333333333',
+      }),
+    )
+    expect(result.draft?.missingFields).toContain('productId')
+    expect(prismaMock.revenue.create).not.toHaveBeenCalled()
+  })
+
+  it('frase de receita pendente gera draft PENDING', async () => {
+    const result = await AssistantService.chat('company-1', { message: 'Tenho uma receita pendente de R$ 3000 para receber dia 10.' })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.draftType).toBe('CREATE_REVENUE')
+    expect(result.draft?.payload).toEqual(expect.objectContaining({ amount: 3000, status: 'PENDING' }))
+    expect(result.draft?.missingFields).toContain('productId')
+    expect(result.draft?.missingFields).not.toContain('accountId')
+    expect(prismaMock.revenue.create).not.toHaveBeenCalled()
+  })
+
   it('complementa rascunho aberto com funcionario e conta sem tratar como consulta nova', async () => {
     prismaMock.employee.findMany.mockResolvedValue([{ id: '22222222-2222-4222-8222-222222222222', name: 'Joao' }])
     prismaMock.account.findMany.mockResolvedValue([{ id: '33333333-3333-4333-8333-333333333333', name: 'Sicredi' }])
@@ -132,6 +186,41 @@ describe('AssistantService.chat', () => {
     expect(result.draft?.missingFields).toEqual([])
     expect(executeAssistantTool).not.toHaveBeenCalled()
     expect(prismaMock.employeePayment.create).not.toHaveBeenCalled()
+  })
+
+  it('complementa rascunho aberto de receita', async () => {
+    prismaMock.product.findMany.mockResolvedValue([{ id: '44444444-4444-4444-8444-444444444444', name: 'Cafe' }])
+    prismaMock.account.findMany.mockResolvedValue([{ id: '33333333-3333-4333-8333-333333333333', name: 'Sicredi' }])
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'produto cafe e recebido no sicredi',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_REVENUE',
+          payload: {
+            description: 'Receita',
+            amount: 800,
+            quantity: 1,
+            unitPrice: 800,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'RECEIVED',
+          },
+          missingFields: ['productId', 'accountId'],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload).toEqual(
+      expect.objectContaining({
+        productId: '44444444-4444-4444-8444-444444444444',
+        accountId: '33333333-3333-4333-8333-333333333333',
+      }),
+    )
+    expect(result.draft?.missingFields).toEqual([])
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.revenue.create).not.toHaveBeenCalled()
   })
 
   it('pedido de boleto parcelado nao lista boletos como consulta', async () => {
@@ -225,6 +314,14 @@ describe('AssistantService.chat', () => {
 
   it('roteia receitas pendentes', async () => {
     await AssistantService.chat('company-1', { message: 'Quanto tenho a receber este mês?' })
+    expectTool('company-1', 'getReceivablesNextDays')
+  })
+
+  it('pergunta quanto tenho a receber continua consulta e nao draft', async () => {
+    const result = await AssistantService.chat('company-1', { message: 'quanto tenho a receber?' })
+
+    expect(result.kind).toBe('ANSWER')
+    expect(result.draft).toBeUndefined()
     expectTool('company-1', 'getReceivablesNextDays')
   })
 

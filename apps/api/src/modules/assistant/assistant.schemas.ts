@@ -57,6 +57,22 @@ const employeePaymentDraftPayloadSchema = z.object({
   notes: z.string().max(1000).optional(),
 })
 
+const revenueDraftPayloadSchema = z.object({
+  description: z.string().min(1).max(500).optional(),
+  amount: z.number().positive(),
+  date: z.coerce.date(),
+  dueDate: z.coerce.date().optional(),
+  receivedAt: z.coerce.date().optional(),
+  status: z.enum(['PENDING', 'RECEIVED']),
+  productId: optionalUuid,
+  accountId: optionalUuid,
+  safraId: optionalUuid,
+  client: z.string().max(150).optional(),
+  notes: z.string().max(1000).optional(),
+  quantity: z.number().positive().optional(),
+  unitPrice: z.number().positive().optional(),
+})
+
 export const assistantDraftSchema = z.discriminatedUnion('draftType', [
   z.object({
     draftType: z.literal('CREATE_EXPENSE'),
@@ -73,6 +89,12 @@ export const assistantDraftSchema = z.discriminatedUnion('draftType', [
   z.object({
     draftType: z.literal('CREATE_EMPLOYEE_PAYMENT'),
     payload: employeePaymentDraftPayloadSchema,
+    missingFields: z.array(z.string()),
+    confirmationRequired: z.literal(true),
+  }),
+  z.object({
+    draftType: z.literal('CREATE_REVENUE'),
+    payload: revenueDraftPayloadSchema,
     missingFields: z.array(z.string()),
     confirmationRequired: z.literal(true),
   }),

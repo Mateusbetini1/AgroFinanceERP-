@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { listAccounts } from '@/features/accounts/api'
 import { listCategories } from '@/features/categories/api'
 import { listActiveEmployees } from '@/features/employees/api'
+import { listProducts } from '@/features/products/api'
 import { listSafras } from '@/features/safras/api'
 import { listSuppliers } from '@/features/suppliers/api'
 import { dateInputToIso, formatCurrency, formatPaymentType, getApiErrorMessage, toDateInputValue } from '@/lib/utils'
@@ -24,6 +25,7 @@ const draftLabels: Record<AssistantDraft['draftType'], string> = {
   CREATE_EXPENSE: 'Despesa',
   CREATE_BILL: 'Boleto',
   CREATE_EMPLOYEE_PAYMENT: 'Pagamento de funcionário',
+  CREATE_REVENUE: 'Receita',
 }
 
 const fieldLabels: Record<string, string> = {
@@ -42,6 +44,8 @@ const fieldLabels: Record<string, string> = {
   categoryId: 'Categoria',
   supplierId: 'Fornecedor',
   safraId: 'Safra',
+  productId: 'Produto',
+  client: 'Cliente',
 }
 
 const paymentTypes: PaymentType[] = ['SALARY', 'OVERTIME', 'ADVANCE', 'BONUS', 'DAILY_WAGE']
@@ -89,6 +93,15 @@ function recalculateMissingFields(draft: AssistantDraft) {
     return missing
   }
 
+  if (draft.draftType === 'CREATE_REVENUE') {
+    if (!Number.isFinite(amount) || amount <= 0) missing.push('amount')
+    if (!payload.date) missing.push('date')
+    if (!payload.status) missing.push('status')
+    if (!payload.productId) missing.push('productId')
+    if (payload.status === 'RECEIVED' && !payload.accountId) missing.push('accountId')
+    return missing
+  }
+
   if (!payload.employeeId) missing.push('employeeId')
   if (!payload.accountId) missing.push('accountId')
   if (!payload.type) missing.push('type')
@@ -104,7 +117,7 @@ function recalculateMissingFields(draft: AssistantDraft) {
 function normalizePayloadValue(key: string, value: string) {
   if (value === '') return undefined
   if (key === 'amount' || key === 'referenceMonth' || key === 'referenceYear') return Number(value)
-  if (key === 'date' || key === 'dueDate') return dateInputToIso(value)
+  if (key === 'date' || key === 'dueDate' || key === 'receivedAt') return dateInputToIso(value)
   return value
 }
 
@@ -133,12 +146,14 @@ export function AssistantDraftCard({
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
   const employeesQuery = useQuery({ queryKey: ['employees', 'active'], queryFn: listActiveEmployees })
+  const productsQuery = useQuery({ queryKey: ['products'], queryFn: listProducts })
 
   const accounts = accountsQuery.data?.data ?? []
   const categories = useMemo(() => (categoriesQuery.data?.data ?? []).filter(isExpenseCategory), [categoriesQuery.data?.data])
   const suppliers = suppliersQuery.data?.data ?? []
   const safras = useMemo(() => (safrasQuery.data?.data ?? []).filter((safra) => safra.active), [safrasQuery.data?.data])
   const employees = employeesQuery.data?.data ?? []
+  const products = useMemo(() => (productsQuery.data?.data ?? []).filter((product) => product.active), [productsQuery.data?.data])
 
   const mutation = useMutation({
     mutationFn: () => confirmAssistantDraft(editableDraft),
@@ -155,8 +170,19 @@ export function AssistantDraftCard({
       [key]: normalizePayloadValue(key, value),
     }
 
+    if (key === 'amount' && editableDraft.draftType === 'CREATE_REVENUE') {
+      payload.unitPrice = normalizePayloadValue(key, value)
+      payload.quantity = payload.quantity ?? 1
+    }
+    if (key === 'dueDate' && editableDraft.draftType === 'CREATE_REVENUE') {
+      payload.receivedAt = normalizePayloadValue(key, value)
+    }
+
     if (key === 'status' && value === 'PAID' && !payload.paidAt) {
       payload.paidAt = dateInputToIso(toDateInputValue(new Date()))
+    }
+    if (key === 'status' && value === 'RECEIVED' && !payload.receivedAt) {
+      payload.receivedAt = dateInputToIso(toDateInputValue(new Date()))
     }
 
     const nextDraft = normalizeDraft({ ...editableDraft, payload } as AssistantDraft)
@@ -185,7 +211,7 @@ export function AssistantDraftCard({
           </div>
         )}
 
-        {editableDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT' && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_BILL') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-category">{fieldLabels.categoryId}</Label>
             <Select
@@ -197,6 +223,24 @@ export function AssistantDraftCard({
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {editableDraft.draftType === 'CREATE_REVENUE' && (
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="assistant-draft-product">{fieldLabels.productId}</Label>
+            <Select
+              id="assistant-draft-product"
+              value={payloadValue(editableDraft.payload, 'productId')}
+              onChange={(event) => patchPayload('productId', event.target.value)}
+            >
+              <option value="">Selecione</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
                 </option>
               ))}
             </Select>
@@ -233,7 +277,7 @@ export function AssistantDraftCard({
           />
         </div>
 
-        {editableDraft.draftType === 'CREATE_EXPENSE' && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_REVENUE') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-date">{fieldLabels.date}</Label>
             <Input
@@ -269,7 +313,7 @@ export function AssistantDraftCard({
           </div>
         )}
 
-        {editableDraft.draftType === 'CREATE_EXPENSE' && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_REVENUE') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-status">{fieldLabels.status}</Label>
             <Select
@@ -277,8 +321,17 @@ export function AssistantDraftCard({
               value={payloadValue(editableDraft.payload, 'status')}
               onChange={(event) => patchPayload('status', event.target.value)}
             >
-              <option value="PENDING">Pendente</option>
-              <option value="PAID">Pago</option>
+              {editableDraft.draftType === 'CREATE_REVENUE' ? (
+                <>
+                  <option value="PENDING">Pendente</option>
+                  <option value="RECEIVED">Recebida</option>
+                </>
+              ) : (
+                <>
+                  <option value="PENDING">Pendente</option>
+                  <option value="PAID">Pago</option>
+                </>
+              )}
             </Select>
           </div>
         )}
@@ -318,7 +371,7 @@ export function AssistantDraftCard({
           </Select>
         </div>
 
-        {editableDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT' && (
+        {(editableDraft.draftType === 'CREATE_EXPENSE' || editableDraft.draftType === 'CREATE_BILL') && (
           <div className="space-y-1">
             <Label htmlFor="assistant-draft-supplier">{fieldLabels.supplierId}</Label>
             <Select
@@ -333,6 +386,17 @@ export function AssistantDraftCard({
                 </option>
               ))}
             </Select>
+          </div>
+        )}
+
+        {editableDraft.draftType === 'CREATE_REVENUE' && (
+          <div className="space-y-1">
+            <Label htmlFor="assistant-draft-client">{fieldLabels.client}</Label>
+            <Input
+              id="assistant-draft-client"
+              value={payloadValue(editableDraft.payload, 'client')}
+              onChange={(event) => patchPayload('client', event.target.value)}
+            />
           </div>
         )}
 
@@ -390,6 +454,17 @@ export function AssistantDraftCard({
               />
             </div>
           </>
+        )}
+
+        {editableDraft.draftType === 'CREATE_REVENUE' && (
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="assistant-draft-revenue-notes">{fieldLabels.notes}</Label>
+            <Textarea
+              id="assistant-draft-revenue-notes"
+              value={payloadValue(editableDraft.payload, 'notes')}
+              onChange={(event) => patchPayload('notes', event.target.value)}
+            />
+          </div>
         )}
       </div>
 

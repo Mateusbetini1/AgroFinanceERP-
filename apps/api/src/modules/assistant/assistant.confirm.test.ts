@@ -17,10 +17,15 @@ vi.mock('../employee-payment/employee-payment.service', () => ({
   EmployeePaymentService: { create: vi.fn() },
 }))
 
+vi.mock('../revenue/revenue.service', () => ({
+  RevenueService: { create: vi.fn() },
+}))
+
 import { AssistantService } from './assistant.service'
 import { ExpenseService } from '../expense/expense.service'
 import { BillService } from '../bill/bill.service'
 import { EmployeePaymentService } from '../employee-payment/employee-payment.service'
+import { RevenueService } from '../revenue/revenue.service'
 import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 
 const req = {} as Parameters<typeof AssistantService.confirmDraft>[2]
@@ -31,6 +36,7 @@ describe('AssistantService.confirmDraft', () => {
     vi.mocked(ExpenseService.create).mockReset()
     vi.mocked(BillService.create).mockReset()
     vi.mocked(EmployeePaymentService.create).mockReset()
+    vi.mocked(RevenueService.create).mockReset()
   })
 
   it('confirmacao cria despesa usando companyId correto', async () => {
@@ -86,6 +92,42 @@ describe('AssistantService.confirmDraft', () => {
     expect(EmployeePaymentService.create).toHaveBeenCalledWith('company-1', payload, req)
   })
 
+  it('confirmacao cria receita usando companyId correto', async () => {
+    vi.mocked(RevenueService.create).mockResolvedValue({ id: 'revenue-1' })
+    prismaMock.product.count.mockResolvedValue(1)
+    prismaMock.account.count.mockResolvedValue(1)
+
+    const payload = {
+      description: 'Venda de cafe',
+      amount: 1750,
+      quantity: 1,
+      unitPrice: 1750,
+      productId: '44444444-4444-4444-8444-444444444444',
+      accountId: '33333333-3333-4333-8333-333333333333',
+      date: new Date('2026-07-01T00:00:00.000Z'),
+      receivedAt: new Date('2026-07-01T00:00:00.000Z'),
+      status: 'RECEIVED' as const,
+      notes: 'Venda de cafe',
+    }
+
+    await AssistantService.confirmDraft('company-1', {
+      draft: { draftType: 'CREATE_REVENUE', payload, missingFields: [], confirmationRequired: true },
+    }, req)
+
+    expect(RevenueService.create).toHaveBeenCalledWith('company-1', {
+      productId: payload.productId,
+      accountId: payload.accountId,
+      safraId: undefined,
+      date: payload.date,
+      receivedAt: payload.receivedAt,
+      quantity: 1,
+      unitPrice: 1750,
+      client: undefined,
+      notes: 'Venda de cafe',
+      status: 'RECEIVED',
+    }, req)
+  })
+
   it('bloqueia confirmacao com campos faltantes', async () => {
     await expect(
       AssistantService.confirmDraft('company-1', {
@@ -130,6 +172,26 @@ describe('AssistantService.confirmDraft', () => {
     expect(EmployeePaymentService.create).not.toHaveBeenCalled()
   })
 
+  it('nao confirma receita com campo obrigatorio faltante', async () => {
+    await expect(
+      AssistantService.confirmDraft('company-1', {
+        draft: {
+          draftType: 'CREATE_REVENUE',
+          payload: {
+            description: 'Venda',
+            amount: 800,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'RECEIVED',
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      }, req),
+    ).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(RevenueService.create).not.toHaveBeenCalled()
+  })
+
   it('rejeita entidade de outra empresa antes de criar', async () => {
     prismaMock.category.count.mockResolvedValue(0)
 
@@ -154,5 +216,28 @@ describe('AssistantService.confirmDraft', () => {
       where: { id: '11111111-1111-4111-8111-111111111111', companyId: 'company-1', deletedAt: null },
     })
     expect(ExpenseService.create).not.toHaveBeenCalled()
+  })
+
+  it('rejeita produto de outra empresa antes de criar receita', async () => {
+    prismaMock.product.count.mockResolvedValue(0)
+
+    await expect(
+      AssistantService.confirmDraft('company-1', {
+        draft: {
+          draftType: 'CREATE_REVENUE',
+          payload: {
+            description: 'Venda de cafe',
+            amount: 1750,
+            productId: '44444444-4444-4444-8444-444444444444',
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'PENDING',
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      }, req),
+    ).rejects.toMatchObject({ statusCode: 400 })
+
+    expect(RevenueService.create).not.toHaveBeenCalled()
   })
 })

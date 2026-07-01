@@ -32,7 +32,7 @@ export type AssistantChatContext = {
 }
 
 export type AssistantDraft = {
-  draftType: 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT'
+  draftType: 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT' | 'CREATE_REVENUE'
   payload: Record<string, unknown>
   missingFields: string[]
   confirmationRequired: true

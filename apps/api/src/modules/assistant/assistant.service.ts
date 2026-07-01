@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/AppError'
 import { BillService } from '../bill/bill.service'
 import { EmployeePaymentService } from '../employee-payment/employee-payment.service'
 import { ExpenseService } from '../expense/expense.service'
+import { RevenueService } from '../revenue/revenue.service'
 import { ASSISTANT_SYSTEM_PROMPT } from './assistant.prompts'
 import { executeAssistantTool, mergeSources } from './assistant.tools'
 import type { Request } from 'express'
@@ -44,7 +45,7 @@ const WRITE_ACTION_PATTERNS = [
 ]
 
 type RoutedIntent = AssistantToolCall | { unsupported: true; reason: string }
-type DraftIntent = 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT'
+type DraftIntent = 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT' | 'CREATE_REVENUE'
 
 function normalizeText(value: string) {
   return value
@@ -57,8 +58,28 @@ function isWriteAction(message: string) {
   return WRITE_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(message)))
 }
 
+function isRevenueDraftAction(message: string) {
+  const normalized = normalizeText(message)
+  if (!extractAmount(message)) return false
+  if (/^\s*(quanto|qual|quais)\b/i.test(normalized) && normalized.includes('receber')) return false
+  return (
+    /\brecebi\b/.test(normalized) ||
+    normalized.includes('recebida') ||
+    normalized.includes('recebido hoje') ||
+    normalized.includes('entrou') ||
+    normalized.includes('lance uma receita') ||
+    normalized.includes('lancar receita') ||
+    normalized.includes('lançar receita') ||
+    normalized.includes('receita pendente') ||
+    normalized.includes('venda de') ||
+    normalized.includes('a receber') ||
+    (normalized.includes('receita') && (normalized.includes('pendente') || normalized.includes('para receber') || isWriteAction(message)))
+  )
+}
+
 function getDraftIntent(message: string): DraftIntent | null {
   const normalized = normalizeText(message)
+  if (isRevenueDraftAction(message)) return 'CREATE_REVENUE'
   if (!isWriteAction(message)) return null
   if (normalized.includes('funcionario') || normalized.includes('vale') || normalized.includes('adiantamento')) {
     return 'CREATE_EMPLOYEE_PAYMENT'
@@ -118,9 +139,9 @@ function extractDays(normalized: string) {
 }
 
 function extractAmount(message: string) {
-  const match = message.match(/(?:R\$\s*)?(\d+(?:[.,]\d{1,2})?)/i)
+  const match = message.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})?|\d+(?:\.\d{1,2})?)/i)
   if (!match) return null
-  return Number(match[1].replace('.', '').replace(',', '.'))
+  return Number(match[1].replace(/\./g, '').replace(',', '.'))
 }
 
 function makeDate(day?: number | null) {
@@ -148,7 +169,7 @@ function extractDueDate(message: string) {
 
 function descriptionFromMessage(message: string, fallback: string) {
   const cleaned = message
-    .replace(/R\$\s*\d+(?:[.,]\d{1,2})?/gi, '')
+    .replace(/R\$\s*\d[\d.]*(?:,\d{1,2})?/gi, '')
     .replace(/\b(crie|criar|lance|lançar|lancar|paguei|registre|registrar|uma|um|de|com|para|vencer|dia)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -232,10 +253,38 @@ async function resolveEmployee(companyId: string, message: string) {
 }
 
 async function resolveAccount(companyId: string, message: string) {
-  const name = extractSearchAfterKeywords(message, ['conta'])
+  const normalized = normalizeText(message)
+  const name = extractSearchAfterKeywords(message, ['conta']) ?? (normalized.includes('caixa') ? 'caixa' : extractSearchAfterKeywords(message, ['no', 'na']))
   if (!name) return null
   return findSingleByName(() =>
     prisma.account.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        active: true,
+        name: { contains: name, mode: 'insensitive' as const },
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+async function resolveProduct(companyId: string, message: string) {
+  const normalized = normalizeText(message)
+  const explicit = extractSearchAfterKeywords(message, ['produto'])
+  const sale = message.match(/venda\s+de\s+([^,.;]+?)(?:\s+r\$|\s+\d|$)/i)?.[1]?.trim()
+  const known = normalized.includes('cafe')
+    ? 'cafe'
+    : normalized.includes('pimentao')
+      ? 'pimentao'
+      : normalized.includes('pepino')
+        ? 'pepino'
+        : null
+  const name = explicit ?? sale ?? known
+  if (!name) return null
+  return findSingleByName(() =>
+    prisma.product.findMany({
       where: {
         companyId,
         deletedAt: null,
@@ -287,6 +336,15 @@ function getRequiredMissingFields(draft: AssistantDraft) {
     return missing
   }
 
+  if (draft.draftType === 'CREATE_REVENUE') {
+    if (!hasPositiveAmount) missing.push('amount')
+    if (!payload.date) missing.push('date')
+    if (!payload.status) missing.push('status')
+    if (!payload.productId) missing.push('productId')
+    if (payload.status === 'RECEIVED' && !payload.accountId) missing.push('accountId')
+    return missing
+  }
+
   if (!payload.employeeId) missing.push('employeeId')
   if (!payload.accountId) missing.push('accountId')
   if (!payload.type) missing.push('type')
@@ -310,12 +368,13 @@ async function completeDraft(companyId: string, input: AssistantChatDto): Promis
   const currentDraft = input.context?.currentDraft
   if (!currentDraft || currentDraft.missingFields.length === 0) return null
 
-  const [category, account, supplier, safra, employee] = await Promise.all([
+  const [category, account, supplier, safra, employee, product] = await Promise.all([
     resolveCategory(companyId, input.message),
     resolveAccount(companyId, input.message),
     resolveSupplier(companyId, input.message),
     resolveSafra(companyId, input.message),
     resolveEmployee(companyId, input.message),
+    resolveProduct(companyId, input.message),
   ])
 
   const payload = { ...currentDraft.payload } as Record<string, unknown>
@@ -326,6 +385,7 @@ async function completeDraft(companyId: string, input: AssistantChatDto): Promis
   }
   if (account) payload.accountId = account.id
   if (currentDraft.draftType === 'CREATE_EMPLOYEE_PAYMENT' && employee) payload.employeeId = employee.id
+  if (currentDraft.draftType === 'CREATE_REVENUE' && product) payload.productId = product.id
 
   return withMissingFields({ ...currentDraft, payload } as AssistantDraft)
 }
@@ -378,6 +438,40 @@ async function buildDraft(companyId: string, input: AssistantChatDto): Promise<A
         status: 'PENDING',
         categoryId: category?.id,
         safraId: safra?.id,
+      },
+      missingFields: [...new Set(missingFields)],
+      confirmationRequired: true,
+    }
+  }
+
+  if (intent === 'CREATE_REVENUE') {
+    const normalized = normalizeText(input.message)
+    const account = await resolveAccount(companyId, input.message)
+    const safra = await resolveSafra(companyId, input.message)
+    const product = await resolveProduct(companyId, input.message)
+    const status = normalized.includes('para receber') || normalized.includes('vou receber') || normalized.includes('a receber') || normalized.includes('pendente')
+      ? 'PENDING'
+      : 'RECEIVED'
+    const date = today
+    const dueDate = status === 'PENDING' ? extractDueDate(input.message) : undefined
+    if (!product) missingFields.push('productId')
+    if (status === 'RECEIVED' && !account) missingFields.push('accountId')
+
+    return {
+      draftType: 'CREATE_REVENUE',
+      payload: {
+        description: descriptionFromMessage(input.message, 'Receita'),
+        amount: amount ?? 0,
+        quantity: 1,
+        unitPrice: amount ?? 0,
+        date,
+        dueDate,
+        receivedAt: status === 'RECEIVED' ? date : dueDate,
+        status,
+        productId: product?.id,
+        accountId: status === 'RECEIVED' ? account?.id : undefined,
+        safraId: safra?.id,
+        notes: descriptionFromMessage(input.message, 'Receita'),
       },
       missingFields: [...new Set(missingFields)],
       confirmationRequired: true,
@@ -724,6 +818,9 @@ async function validateDraftRelations(companyId: string, draft: AssistantDraft) 
   await assertCompanyEntity('employeeId', payload.employeeId, (id) =>
     prisma.employee.count({ where: { id, companyId, deletedAt: null } }),
   )
+  await assertCompanyEntity('productId', payload.productId, (id) =>
+    prisma.product.count({ where: { id, companyId, deletedAt: null } }),
+  )
 }
 
 export const AssistantService = {
@@ -760,7 +857,7 @@ export const AssistantService = {
     if (draft) {
       return {
         kind: 'DRAFT',
-        answer: 'Montei um rascunho para você revisar.',
+        answer: draft.draftType === 'CREATE_REVENUE' ? 'Montei um rascunho de receita para você revisar.' : 'Montei um rascunho para você revisar.',
         sources: [],
         draft,
       }
@@ -815,6 +912,26 @@ export const AssistantService = {
       return {
         draftType: draft.draftType,
         created: await BillService.create(companyId, draft.payload, req),
+      }
+    }
+
+    if (draft.draftType === 'CREATE_REVENUE') {
+      const payload = draft.payload
+      if (!payload.productId) throw AppError.badRequest('productId é obrigatório para confirmar receita')
+      return {
+        draftType: draft.draftType,
+        created: await RevenueService.create(companyId, {
+          productId: payload.productId,
+          accountId: payload.accountId,
+          safraId: payload.safraId,
+          date: payload.date,
+          receivedAt: payload.receivedAt ?? payload.dueDate,
+          quantity: payload.quantity ?? 1,
+          unitPrice: payload.unitPrice ?? payload.amount,
+          client: payload.client,
+          notes: payload.notes ?? payload.description,
+          status: payload.status,
+        }, req),
       }
     }
 

@@ -18,6 +18,8 @@ Distinções importantes:
 - Se a pergunta mencionar "safra" ou "safras cadastradas", use getSafras ou getActiveSafras. Safra cadastrada não depende de ter receita/despesa/boleto.
 - Se a pergunta mencionar prejuízo, resultado ou financeiro de safra, use getSafrasWithFinancialSummary ou getSafraSummary.
 - Se a pergunta pedir "quanto tenho para pagar" sem especificar, use getPayablesSummary para separar boletos e despesas pendentes.
+- Perguntas como "quanto tenho a receber?" continuam sendo consulta e devem usar getReceivablesNextDays.
+- Frases de ação como "recebi", "lance uma receita", "venda de", "entrou", "a receber", "receita pendente" ou "recebido hoje" são tratadas pelo backend como rascunho com confirmação, não como consulta.
 - Cite o período quando usar próximos dias.
 
 Ferramentas permitidas:
