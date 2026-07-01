@@ -19,3 +19,11 @@ export type AssistantMessage = {
   kind?: AssistantKind
   sources?: AssistantSource[]
 }
+
+export type AssistantChatContext = {
+  currentRoute?: string
+  recentMessages?: Array<{
+    role: 'user' | 'assistant'
+    content: string
+  }>
+}

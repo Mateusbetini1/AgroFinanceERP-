@@ -5,23 +5,42 @@ import type { AssistantChatDto, AssistantResponse, AssistantToolCall, AssistantT
 
 const ALLOWED_TOOLS: AssistantToolName[] = [
   'getUpcomingBills',
+  'getPendingBills',
   'getOverdueBills',
   'getPayablesNextDays',
+  'getPayablesSummary',
   'getReceivablesNextDays',
   'getCashflowForecast',
+  'getSafras',
+  'getActiveSafras',
   'getSafraSummary',
+  'getSafrasWithFinancialSummary',
+  'getPendingExpenses',
+  'getOverdueExpenses',
+  'getExpensesDueNextDays',
+  'getExpensesSummary',
+  'getPaidExpenses',
   'getExpensesByCategory',
   'getCurrentFinancialPosition',
 ]
 
 const WRITE_ACTION_PATTERNS = [
-  /^\s*(crie|criar|lance|lançar|registre|registrar|edite|editar|exclua|excluir|delete|deletar|remova|remover)\b/i,
+  /^\s*(crie|criar|lance|lancar|lançar|registre|registrar|edite|editar|exclua|excluir|delete|deletar|remova|remover)\b/i,
   /\bpaguei\b/i,
   /^\s*pagar\b/i,
 ]
 
+type RoutedIntent = AssistantToolCall | { unsupported: true; reason: string }
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
 function isWriteAction(message: string) {
-  return WRITE_ACTION_PATTERNS.some((pattern) => pattern.test(message))
+  return WRITE_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(message)))
 }
 
 function extractJson(text: string): unknown {
@@ -56,32 +75,102 @@ function parseToolCall(value: unknown): AssistantToolCall | null {
   }
 }
 
-function fallbackIntent(message: string): AssistantToolCall {
-  const normalized = message.toLowerCase()
-  const dayMatch = normalized.match(/pr[oó]ximos?\s+(\d+)\s+dias?/)
-  const days = dayMatch ? Number(dayMatch[1]) : undefined
-
-  if (normalized.includes('vencid')) return { tool: 'getOverdueBills' }
-  if (normalized.includes('safra') || normalized.includes('preju')) {
-    const search = normalized.includes('café') || normalized.includes('cafe') ? 'cafe' : undefined
-    return { tool: 'getSafraSummary', args: { search } }
-  }
-  if (normalized.includes('caixa') || normalized.includes('projet')) return { tool: 'getCashflowForecast', args: { months: 1 } }
-  if (normalized.includes('receber') || normalized.includes('receita')) return { tool: 'getReceivablesNextDays', args: { days: days ?? 30 } }
-  if (normalized.includes('categoria') || normalized.includes('insumo') || normalized.includes('gastei')) {
-    return { tool: 'getExpensesByCategory' }
-  }
-  if (normalized.includes('pagar') || normalized.includes('vence') || normalized.includes('boleto')) {
-    return { tool: 'getPayablesNextDays', args: { days: days ?? 7 } }
-  }
-  return { tool: 'getCurrentFinancialPosition' }
+function getContextText(input: AssistantChatDto) {
+  const recent = input.context?.recentMessages ?? []
+  return recent.map((item) => `${item.role}: ${item.content}`).join('\n')
 }
 
-async function callGeminiForTool(message: string): Promise<AssistantToolCall | null> {
+function extractDays(normalized: string) {
+  const explicit = normalized.match(/proximos?\s+(\d+)\s+dias?/)
+  if (explicit) return Number(explicit[1])
+  if (normalized.includes('semana')) return 7
+  if (normalized.includes('mes')) return 30
+  return undefined
+}
+
+function extractSafraSearch(message: string) {
+  const normalized = normalizeText(message)
+  const cafe = normalized.includes('cafe') ? 'cafe' : undefined
+  if (cafe) return cafe
+
+  const match = message.match(/safra\s+(.+)$/i)
+  return match?.[1]?.trim().slice(0, 100)
+}
+
+function routeIntent(input: AssistantChatDto): RoutedIntent | null {
+  const normalized = normalizeText(input.message)
+  const context = normalizeText(getContextText(input))
+  const days = extractDays(normalized)
+  const mentionsExpense = /\bdespesa(s)?\b/.test(normalized) || normalized.includes('alem de boleto')
+  const mentionsBill = /\bboleto(s)?\b/.test(normalized) || normalized.includes('conta para pagar') || normalized.includes('contas para pagar')
+  const mentionsSafra = /\bsafra(s)?\b/.test(normalized)
+  const mentionsRevenue = normalized.includes('receita') || normalized.includes('receber')
+  const mentionsCash = normalized.includes('saldo') || normalized.includes('caixa') || normalized.includes('posicao financeira')
+  const mentionsForecast = normalized.includes('projet') || normalized.includes('fluxo')
+  const mentionsCategory = normalized.includes('categoria') || normalized.includes('insumo') || normalized.includes('insumos')
+  const asksToPay = normalized.includes('para pagar') || normalized.includes('a pagar') || normalized.includes('ser pago') || normalized.includes('tenho que pagar')
+
+  if (normalized.includes('fornecedor') || normalized.includes('funcionario') || normalized.includes('folha')) {
+    return { unsupported: true, reason: 'Eu ainda não consigo consultar fornecedores, funcionários ou folha com precisão nesta versão.' }
+  }
+
+  if (mentionsSafra) {
+    if (normalized.includes('preju') || normalized.includes('resultado') || normalized.includes('financeir') || normalized.includes('custo')) {
+      return { tool: 'getSafrasWithFinancialSummary', args: { search: extractSafraSearch(input.message) } }
+    }
+    if (normalized.includes('ativa') || normalized.includes('ativas') || normalized.includes('andamento')) {
+      return { tool: 'getActiveSafras' }
+    }
+    return { tool: 'getSafras', args: { search: extractSafraSearch(input.message) } }
+  }
+
+  if (mentionsExpense || (normalized.trim().startsWith('e em despesa') && (context.includes('boleto') || context.includes('pagar')))) {
+    if (normalized.includes('vencid')) return { tool: 'getOverdueExpenses' }
+    if (days || normalized.includes('vence') || normalized.includes('vencem') || normalized.includes('semana')) {
+      return { tool: 'getExpensesDueNextDays', args: { days: days ?? 7 } }
+    }
+    if (normalized.includes('paga') || normalized.includes('gastei') || normalized.includes('gasto')) {
+      if (normalized.includes('pendente')) return { tool: 'getExpensesSummary' }
+      return { tool: 'getPaidExpenses' }
+    }
+    if (mentionsCategory) return { tool: 'getExpensesByCategory' }
+    return { tool: 'getPendingExpenses' }
+  }
+
+  if (mentionsBill) {
+    if (normalized.includes('vencid')) return { tool: 'getOverdueBills' }
+    if (normalized.includes('pendente') && !days) return { tool: 'getPendingBills' }
+    if (days || normalized.includes('vence') || normalized.includes('vencem') || normalized.includes('dia ') || asksToPay) {
+      return { tool: 'getPayablesNextDays', args: { days: days ?? 7 } }
+    }
+    return { tool: 'getPendingBills' }
+  }
+
+  if (mentionsRevenue) return { tool: 'getReceivablesNextDays', args: { days: days ?? 30 } }
+  if (mentionsForecast) return { tool: 'getCashflowForecast', args: { months: normalized.includes('30 dias') ? 1 : 1 } }
+  if (mentionsCash) return { tool: 'getCurrentFinancialPosition' }
+  if (mentionsCategory) return { tool: 'getExpensesByCategory' }
+  if (asksToPay || normalized.includes('quanto tenho para pagar')) return { tool: 'getPayablesSummary' }
+
+  return null
+}
+
+function fallbackIntent(input: AssistantChatDto): RoutedIntent {
+  const normalized = normalizeText(input.message)
+  const days = extractDays(normalized)
+
+  if (normalized.includes('vencid')) return { tool: 'getOverdueBills' }
+  if (normalized.includes('receber') || normalized.includes('receita')) return { tool: 'getReceivablesNextDays', args: { days: days ?? 30 } }
+  if (normalized.includes('pagar') || normalized.includes('vence')) return { tool: 'getPayablesSummary' }
+  return { unsupported: true, reason: 'Eu ainda não consigo consultar isso com precisão nesta versão.' }
+}
+
+async function callGeminiForTool(input: AssistantChatDto): Promise<AssistantToolCall | null> {
   if (!env.AI_API_KEY) return null
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), env.AI_TIMEOUT_MS)
+  const contextText = getContextText(input)
 
   try {
     const response = await fetch(
@@ -102,7 +191,13 @@ async function callGeminiForTool(message: string): Promise<AssistantToolCall | n
           contents: [
             {
               role: 'user',
-              parts: [{ text: message }],
+              parts: [
+                {
+                  text: contextText
+                    ? `Histórico recente:\n${contextText}\n\nPergunta atual:\n${input.message}`
+                    : input.message,
+                },
+              ],
             },
           ],
         }),
@@ -126,42 +221,147 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
+function formatDate(value: unknown) {
+  if (!value) return 'sem data'
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(value as string | Date))
+}
+
+function itemList<T>(items: T[] | undefined, format: (item: T) => string, limit = 3) {
+  if (!items || items.length === 0) return ''
+  return ` Principais: ${items.slice(0, limit).map(format).join('; ')}.`
+}
+
+function statusLabel(status: unknown) {
+  const value = String(status ?? '')
+  const labels: Record<string, string> = {
+    PENDING: 'Pendente',
+    PAID: 'Pago',
+    OVERDUE: 'Vencido',
+    RECEIVED: 'Recebido',
+    PLANNED: 'Planejada',
+    ACTIVE: 'Ativa',
+    COMPLETED: 'Concluída',
+    CANCELLED: 'Cancelada',
+  }
+  return labels[value] ?? value
+}
+
+function buildBillAnswer(toolCall: AssistantToolCall, payload: Record<string, unknown>) {
+  const count = Number(payload.count ?? 0)
+  const total = Number(payload.total ?? 0)
+  const bills = payload.bills as Array<{ description?: string; amount?: number; dueDate?: string; status?: string }> | undefined
+  if (count === 0) {
+    if (toolCall.tool === 'getOverdueBills') return 'Não encontrei boletos vencidos.'
+    if (toolCall.tool === 'getUpcomingBills' || toolCall.tool === 'getPayablesNextDays') return 'Não encontrei boletos próximos no período consultado.'
+    return 'Não encontrei boletos pendentes cadastrados.'
+  }
+  const intro = toolCall.tool === 'getOverdueBills' ? 'boletos vencidos' : toolCall.tool === 'getPendingBills' ? 'boletos pendentes' : 'boletos no período consultado'
+  return `Encontrei ${count} ${intro}, totalizando ${formatCurrency(total)}.${itemList(bills, (bill) => `${bill.description ?? 'Boleto'} (${formatCurrency(Number(bill.amount ?? 0))}, venc. ${formatDate(bill.dueDate)}, ${statusLabel(bill.status)})`)}`
+}
+
+function buildExpenseAnswer(toolCall: AssistantToolCall, payload: Record<string, unknown>) {
+  const count = Number(payload.count ?? 0)
+  const total = Number(payload.total ?? 0)
+  const expenses = payload.expenses as Array<{ description?: string; amount?: number; dueDate?: string; date?: string; status?: string }> | undefined
+
+  if (toolCall.tool === 'getExpensesSummary') {
+    const paid = payload.paid as { count?: number; total?: number }
+    const pending = payload.pending as { count?: number; total?: number }
+    const overdue = payload.overdue as { count?: number; total?: number }
+    return `No mês atual, despesas pagas somam ${formatCurrency(Number(paid?.total ?? 0))} (${Number(paid?.count ?? 0)}), pendentes somam ${formatCurrency(Number(pending?.total ?? 0))} (${Number(pending?.count ?? 0)}) e vencidas somam ${formatCurrency(Number(overdue?.total ?? 0))} (${Number(overdue?.count ?? 0)}).`
+  }
+
+  if (count === 0) {
+    if (toolCall.tool === 'getOverdueExpenses') return 'Não encontrei despesas vencidas.'
+    if (toolCall.tool === 'getPaidExpenses') return 'Não encontrei despesas pagas no mês atual.'
+    if (toolCall.tool === 'getExpensesDueNextDays') return 'Não encontrei despesas vencendo no período consultado.'
+    return 'Não encontrei despesas pendentes cadastradas.'
+  }
+
+  const label =
+    toolCall.tool === 'getOverdueExpenses'
+      ? 'despesas vencidas'
+      : toolCall.tool === 'getPaidExpenses'
+        ? 'despesas pagas no mês atual'
+        : toolCall.tool === 'getExpensesDueNextDays'
+          ? 'despesas no período consultado'
+          : 'despesas pendentes cadastradas'
+
+  return `Você tem ${formatCurrency(total)} em ${label} (${count} lançamento(s)).${itemList(expenses, (expense) => `${expense.description ?? 'Despesa'} (${formatCurrency(Number(expense.amount ?? 0))}, venc. ${formatDate(expense.dueDate ?? expense.date)}, ${statusLabel(expense.status)})`)}`
+}
+
+function buildSafraAnswer(toolCall: AssistantToolCall, payload: Record<string, unknown>) {
+  const items = (payload.data as Array<{
+    name?: string
+    safraName?: string
+    product?: { name?: string; unit?: string }
+    productName?: string
+    farmLocation?: { name?: string }
+    farmLocationName?: string | null
+    status?: string
+    startDate?: string
+    endDate?: string | null
+    projectedResult?: number
+  }> | undefined) ?? []
+  const count = Number(payload.count ?? items.length)
+
+  if (count === 0) return 'Não encontrei safras cadastradas para os filtros informados.'
+
+  if (toolCall.tool === 'getSafraSummary' || toolCall.tool === 'getSafrasWithFinancialSummary') {
+    const negative = items.filter((item) => Number(item.projectedResult ?? 0) < 0)
+    if (negative.length > 0) {
+      return `Encontrei ${negative.length} safra(s) com resultado previsto negativo. Principal: ${negative[0].safraName ?? negative[0].name ?? 'Safra'} com resultado de ${formatCurrency(Number(negative[0].projectedResult ?? 0))}.`
+    }
+    return `Encontrei ${count} safra(s) no relatório e nenhuma com resultado previsto negativo nos dados consultados.`
+  }
+
+  return `Você tem ${count} safra(s) cadastrada(s).${itemList(items, (safra) => {
+    const product = safra.product?.name ?? safra.productName ?? 'sem produto'
+    const location = safra.farmLocation?.name ?? safra.farmLocationName ?? 'sem local'
+    return `${safra.name ?? safra.safraName ?? 'Safra'} (${product}, ${location}, ${statusLabel(safra.status)}, início ${formatDate(safra.startDate)})`
+  })}`
+}
+
 function buildAnswer(toolCall: AssistantToolCall, data: unknown): string {
   const payload = data as Record<string, unknown>
 
   switch (toolCall.tool) {
     case 'getUpcomingBills':
-    case 'getOverdueBills': {
-      const count = Number(payload.count ?? 0)
-      const total = Number(payload.total ?? 0)
-      if (count === 0) return toolCall.tool === 'getOverdueBills' ? 'Não encontrei boletos vencidos.' : 'Não encontrei boletos próximos nesse período.'
-      return `Encontrei ${count} boleto(s), totalizando ${formatCurrency(total)}. Confira a lista em Boletos.`
-    }
+    case 'getPendingBills':
+    case 'getOverdueBills':
+      return buildBillAnswer(toolCall, payload)
     case 'getPayablesNextDays': {
-      const upcomingBills = payload.upcomingBills as { count?: number; total?: number } | undefined
-      const total = Number(upcomingBills?.total ?? payload.payablesNext7Days ?? 0)
-      const count = Number(upcomingBills?.count ?? 0)
-      return `Você tem ${formatCurrency(total)} a pagar no período consultado${count ? ` em ${count} boleto(s)` : ''}.`
+      const upcomingBills = payload.upcomingBills as Record<string, unknown> | undefined
+      return buildBillAnswer(toolCall, upcomingBills ?? payload)
+    }
+    case 'getPayablesSummary': {
+      const bills = payload.bills as { total?: number; count?: number } | undefined
+      const expenses = payload.expenses as { total?: number; count?: number } | undefined
+      return `Considerando boletos e despesas pendentes/vencidas, você tem ${formatCurrency(Number(payload.totalPayables ?? 0))} a pagar. Boletos: ${formatCurrency(Number(bills?.total ?? 0))} (${Number(bills?.count ?? 0)}). Despesas: ${formatCurrency(Number(expenses?.total ?? 0))} (${Number(expenses?.count ?? 0)}).`
     }
     case 'getReceivablesNextDays': {
-      return `Você tem ${formatCurrency(Number(payload.total ?? 0))} a receber no período consultado.`
+      const revenues = payload.revenues as Array<{ client?: string; totalAmount?: number; receivedAt?: string; date?: string }> | undefined
+      return `Você tem ${formatCurrency(Number(payload.total ?? 0))} a receber no período consultado (${Number(payload.count ?? 0)} lançamento(s)).${itemList(revenues, (revenue) => `${revenue.client ?? 'Receita'} (${formatCurrency(Number(revenue.totalAmount ?? 0))}, data ${formatDate(revenue.receivedAt ?? revenue.date)})`)}`
     }
     case 'getCashflowForecast': {
       const summary = payload.summary as { finalProjectedBalance?: number; lowestProjectedBalance?: number } | undefined
       return `No fluxo projetado, o saldo final estimado é ${formatCurrency(Number(summary?.finalProjectedBalance ?? 0))}. O menor saldo projetado é ${formatCurrency(Number(summary?.lowestProjectedBalance ?? 0))}.`
     }
-    case 'getSafraSummary': {
-      const items = (payload.data as Array<{ safraName?: string; projectedResult?: number }> | undefined) ?? []
-      const negative = items.filter((item) => Number(item.projectedResult ?? 0) < 0)
-      if (negative.length > 0) {
-        return `Encontrei ${negative.length} safra(s) com resultado previsto negativo. A principal é ${negative[0].safraName ?? 'uma safra'} com resultado de ${formatCurrency(Number(negative[0].projectedResult ?? 0))}.`
-      }
-      return items.length > 0 ? 'Não encontrei safra com resultado previsto negativo nos dados consultados.' : 'Não encontrei safras para os filtros informados.'
-    }
+    case 'getSafras':
+    case 'getActiveSafras':
+    case 'getSafraSummary':
+    case 'getSafrasWithFinancialSummary':
+      return buildSafraAnswer(toolCall, payload)
+    case 'getPendingExpenses':
+    case 'getOverdueExpenses':
+    case 'getExpensesDueNextDays':
+    case 'getExpensesSummary':
+    case 'getPaidExpenses':
+      return buildExpenseAnswer(toolCall, payload)
     case 'getExpensesByCategory': {
-      const items = (payload.data as Array<{ categoryName?: string; total?: number }> | undefined) ?? []
-      if (items.length === 0) return 'Não encontrei despesas por categoria no período atual.'
-      return `A maior categoria de despesa no período é ${items[0].categoryName ?? 'sem categoria'}, com ${formatCurrency(Number(items[0].total ?? 0))}.`
+      const items = (payload.data as Array<{ categoryName?: string; total?: number; count?: number }> | undefined) ?? []
+      if (items.length === 0) return 'Não encontrei despesas por categoria no mês atual.'
+      return `A maior categoria de despesa no mês atual é ${items[0].categoryName ?? 'sem categoria'}, com ${formatCurrency(Number(items[0].total ?? 0))}.`
     }
     case 'getCurrentFinancialPosition': {
       const position = payload.position as { totalBalance?: number } | undefined
@@ -189,12 +389,22 @@ export const AssistantService = {
       }
     }
 
-    const toolCall = (await callGeminiForTool(input.message)) ?? fallbackIntent(input.message)
-    const result = await executeAssistantTool(companyId, toolCall)
+    const deterministicIntent = routeIntent(input)
+    const routedIntent = deterministicIntent ?? (await callGeminiForTool(input)) ?? fallbackIntent(input)
+
+    if ('unsupported' in routedIntent) {
+      return {
+        kind: 'NEEDS_CLARIFICATION',
+        answer: routedIntent.reason,
+        sources: [],
+      }
+    }
+
+    const result = await executeAssistantTool(companyId, routedIntent)
 
     return {
       kind: 'ANSWER',
-      answer: buildAnswer(toolCall, result.data),
+      answer: buildAnswer(routedIntent, result.data),
       sources: mergeSources(result.sources),
       data: result.data,
     }

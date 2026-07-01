@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { Send } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
@@ -15,16 +16,27 @@ import type { AssistantMessage } from '../types'
 const suggestions = [
   'O que vence nos próximos 7 dias?',
   'Tenho boletos vencidos?',
+  'Quanto tenho em despesas pendentes?',
+  'Tenho safras cadastradas?',
   'Como está meu caixa nos próximos 30 dias?',
-  'Qual safra está dando prejuízo?',
-  'Quanto tenho a receber este mês?',
 ]
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+function contextFromMessages(messages: AssistantMessage[]) {
+  return messages
+    .filter((item) => item.content.trim().length > 0)
+    .slice(-8)
+    .map((item) => ({
+      role: item.role,
+      content: item.content,
+    }))
+}
+
 export function AssistantChat() {
+  const pathname = usePathname()
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<AssistantMessage[]>([
     {
@@ -70,9 +82,16 @@ export function AssistantChat() {
     const content = (nextMessage ?? message).trim()
     if (!content || mutation.isPending) return
 
+    const recentMessages = contextFromMessages(messages)
     setMessages((current) => [...current, { id: createId(), role: 'user', content }])
     setMessage('')
-    mutation.mutate(content)
+    mutation.mutate({
+      message: content,
+      context: {
+        currentRoute: pathname,
+        recentMessages,
+      },
+    })
   }
 
   return (
