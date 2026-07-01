@@ -3,6 +3,71 @@ import { DataTable, type DataTableColumn } from '@/components/data/data-table'
 import { RowActions } from '@/components/data/row-actions'
 import { formatCurrency, formatDate, formatDecimal, formatStatusLabel } from '@/lib/utils'
 import type { Revenue } from '@/types/api'
+import type { ReactNode } from 'react'
+
+type RevenueWithSafra = Revenue & {
+  safra?: { name: string } | null
+}
+
+function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
+  if (!value || value === '-') return null
+
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <div className="mt-1 text-sm text-foreground">{value}</div>
+    </div>
+  )
+}
+
+function RevenueMobileCard({
+  revenue,
+  deletingId,
+  onEdit,
+  onDelete,
+}: {
+  revenue: Revenue
+  deletingId?: string | null
+  onEdit: (revenue: Revenue) => void
+  onDelete: (revenue: Revenue) => void
+}) {
+  const safraName = (revenue as RevenueWithSafra).safra?.name
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-foreground">{revenue.product.name}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatDecimal(revenue.quantity, 2)} unidade(s)
+          </p>
+        </div>
+        <Badge variant={revenue.status === 'RECEIVED' ? 'success' : 'warning'} className="shrink-0">
+          {formatStatusLabel(revenue.status)}
+        </Badge>
+      </div>
+
+      <div className="rounded-md border bg-muted/30 p-3">
+        <p className="text-xs font-medium uppercase text-muted-foreground">Valor total</p>
+        <p className="mt-1 text-xl font-semibold tracking-normal">{formatCurrency(revenue.totalAmount)}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <MobileMeta label="Data" value={formatDate(revenue.date)} />
+        <MobileMeta label="Prev./Recebimento" value={formatDate(revenue.receivedAt)} />
+        <MobileMeta label="Cliente" value={revenue.client} />
+        <MobileMeta label="Conta" value={revenue.account?.name} />
+        <MobileMeta label="Safra" value={safraName} />
+      </div>
+
+      <RowActions
+        onEdit={() => onEdit(revenue)}
+        onDelete={() => onDelete(revenue)}
+        isDeleting={deletingId === revenue.id}
+      />
+    </div>
+  )
+}
 
 export function RevenuesTable({
   revenues,
@@ -44,5 +109,14 @@ export function RevenuesTable({
     },
   ]
 
-  return <DataTable columns={columns} data={revenues} getRowKey={(revenue) => revenue.id} />
+  return (
+    <DataTable
+      columns={columns}
+      data={revenues}
+      getRowKey={(revenue) => revenue.id}
+      mobileCard={(revenue) => (
+        <RevenueMobileCard revenue={revenue} deletingId={deletingId} onEdit={onEdit} onDelete={onDelete} />
+      )}
+    />
+  )
 }
