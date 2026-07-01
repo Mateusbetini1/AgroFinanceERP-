@@ -89,8 +89,7 @@ export function RevenueForm({
       return
     }
 
-    setError(null)
-    onSubmit({
+    const payload: RevenuePayload = {
       productId,
       accountId: accountId || null,
       safraId: safraId || null,
@@ -98,10 +97,30 @@ export function RevenueForm({
       receivedAt: dateInputToIso(receivedAt),
       quantity: parsedQuantity,
       unitPrice: parsedUnitPrice,
-      client: client.trim() ? client : null,
-      notes: notes.trim() ? notes : null,
+      client: client.trim() ? client.trim() : null,
+      notes: notes.trim() ? notes.trim() : null,
       status,
-    })
+    }
+
+    if (
+      initialValue &&
+      payload.productId === initialValue.productId &&
+      payload.accountId === (initialValue.accountId ?? null) &&
+      payload.safraId === (initialValue.safraId ?? null) &&
+      payload.date === dateInputToIso(toDateInputValue(initialValue.date)) &&
+      payload.receivedAt === dateInputToIso(toDateInputValue(initialValue.receivedAt)) &&
+      payload.quantity === Number(initialValue.quantity) &&
+      payload.unitPrice === Number(initialValue.unitPrice) &&
+      payload.client === (initialValue.client ?? null) &&
+      payload.notes === (initialValue.notes ?? null) &&
+      payload.status === initialValue.status
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
+    setError(null)
+    onSubmit(payload)
   }
 
   return (

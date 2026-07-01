@@ -96,8 +96,7 @@ export function ExpenseForm({
 
     const effectivePaidAt = shouldPay ? paidAt || toDateInputValue(new Date()) : paidAt
 
-    setError(null)
-    onSubmit({
+    const payload: ExpensePayload = {
       categoryId,
       supplierId: supplierId || null,
       accountId: accountId || null,
@@ -109,7 +108,28 @@ export function ExpenseForm({
       description: description.trim(),
       ...(status ? { status } : {}),
       attachmentUrl: attachmentUrl.trim() ? attachmentUrl.trim() : null,
-    })
+    }
+
+    if (
+      initialValue &&
+      payload.categoryId === initialValue.categoryId &&
+      payload.supplierId === (initialValue.supplierId ?? null) &&
+      payload.accountId === (initialValue.accountId ?? null) &&
+      payload.safraId === (initialValue.safraId ?? null) &&
+      payload.date === dateInputToIso(toDateInputValue(initialValue.date)) &&
+      payload.dueDate === dateInputToIso(toDateInputValue(initialValue.dueDate)) &&
+      payload.paidAt === dateInputToIso(toDateInputValue(initialValue.paidAt)) &&
+      payload.amount === Number(initialValue.amount) &&
+      payload.description === initialValue.description &&
+      (payload.status ?? initialValue.status) === initialValue.status &&
+      payload.attachmentUrl === (initialValue.attachmentUrl ?? null)
+    ) {
+      setError('Altere ao menos um campo antes de salvar.')
+      return
+    }
+
+    setError(null)
+    onSubmit(payload)
   }
 
   return (
