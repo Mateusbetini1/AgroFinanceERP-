@@ -115,7 +115,7 @@ export function BillRecurringForm({ suppliers, accounts, categories, safras, isS
             id="recurring-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Energia eletrica"
+            placeholder="Energia elétrica"
             required
           />
         </div>
