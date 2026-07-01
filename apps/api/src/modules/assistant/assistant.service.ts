@@ -1,7 +1,20 @@
 import { env } from '../../config/env'
+import { prisma } from '../../config/prisma'
+import { AppError } from '../../shared/errors/AppError'
+import { BillService } from '../bill/bill.service'
+import { EmployeePaymentService } from '../employee-payment/employee-payment.service'
+import { ExpenseService } from '../expense/expense.service'
 import { ASSISTANT_SYSTEM_PROMPT } from './assistant.prompts'
 import { executeAssistantTool, mergeSources } from './assistant.tools'
-import type { AssistantChatDto, AssistantResponse, AssistantToolCall, AssistantToolName } from './assistant.schemas'
+import type { Request } from 'express'
+import type {
+  AssistantChatDto,
+  AssistantDraft,
+  AssistantResponse,
+  AssistantToolCall,
+  AssistantToolName,
+  ConfirmAssistantDraftDto,
+} from './assistant.schemas'
 
 const ALLOWED_TOOLS: AssistantToolName[] = [
   'getUpcomingBills',
@@ -31,6 +44,7 @@ const WRITE_ACTION_PATTERNS = [
 ]
 
 type RoutedIntent = AssistantToolCall | { unsupported: true; reason: string }
+type DraftIntent = 'CREATE_EXPENSE' | 'CREATE_BILL' | 'CREATE_EMPLOYEE_PAYMENT'
 
 function normalizeText(value: string) {
   return value
@@ -41,6 +55,21 @@ function normalizeText(value: string) {
 
 function isWriteAction(message: string) {
   return WRITE_ACTION_PATTERNS.some((pattern) => pattern.test(normalizeText(message)))
+}
+
+function getDraftIntent(message: string): DraftIntent | null {
+  const normalized = normalizeText(message)
+  if (!isWriteAction(message)) return null
+  if (normalized.includes('funcionario') || normalized.includes('vale') || normalized.includes('adiantamento')) {
+    return 'CREATE_EMPLOYEE_PAYMENT'
+  }
+  if (normalized.includes('boleto') || normalized.includes('vencer') || normalized.includes('vencimento')) {
+    return 'CREATE_BILL'
+  }
+  if (normalized.includes('despesa') || normalized.includes('lance') || normalized.includes('lancar')) {
+    return 'CREATE_EXPENSE'
+  }
+  return null
 }
 
 function extractJson(text: string): unknown {
@@ -86,6 +115,185 @@ function extractDays(normalized: string) {
   if (normalized.includes('semana')) return 7
   if (normalized.includes('mes')) return 30
   return undefined
+}
+
+function extractAmount(message: string) {
+  const match = message.match(/(?:R\$\s*)?(\d+(?:[.,]\d{1,2})?)/i)
+  if (!match) return null
+  return Number(match[1].replace('.', '').replace(',', '.'))
+}
+
+function makeDate(day?: number | null) {
+  const now = new Date()
+  if (!day) return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const candidate = new Date(now.getFullYear(), now.getMonth(), day)
+  if (candidate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+    return new Date(now.getFullYear(), now.getMonth() + 1, day)
+  }
+  return candidate
+}
+
+function extractDueDate(message: string) {
+  const normalized = normalizeText(message)
+  const iso = message.match(/(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/)
+  if (iso) {
+    const day = Number(iso[1])
+    const month = Number(iso[2]) - 1
+    const year = iso[3] ? Number(iso[3].length === 2 ? `20${iso[3]}` : iso[3]) : new Date().getFullYear()
+    return new Date(year, month, day)
+  }
+  const dayMatch = normalized.match(/(?:dia|vencer dia|vence dia)\s+(\d{1,2})/)
+  return makeDate(dayMatch ? Number(dayMatch[1]) : null)
+}
+
+function descriptionFromMessage(message: string, fallback: string) {
+  const cleaned = message
+    .replace(/R\$\s*\d+(?:[.,]\d{1,2})?/gi, '')
+    .replace(/\b(crie|criar|lance|lançar|lancar|paguei|registre|registrar|uma|um|de|com|para|vencer|dia)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return (cleaned || fallback).slice(0, 500)
+}
+
+async function findSingleByName<T extends { id: string; name: string }>(
+  finder: () => Promise<T[]>,
+) {
+  const matches = await finder()
+  return matches.length === 1 ? matches[0] : null
+}
+
+async function resolveCategory(companyId: string, message: string) {
+  const normalized = normalizeText(message)
+  const terms = normalized.includes('combustivel')
+    ? ['combust']
+    : normalized.includes('defensivo')
+      ? ['defensivo', 'insumo']
+      : normalized.includes('insumo')
+        ? ['insumo']
+        : []
+  if (terms.length === 0) return null
+  return findSingleByName(() =>
+    prisma.category.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        type: { in: ['EXPENSE', 'BOTH'] },
+        OR: terms.map((term) => ({ name: { contains: term, mode: 'insensitive' as const } })),
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+async function resolveSafra(companyId: string, message: string) {
+  const normalized = normalizeText(message)
+  if (!normalized.includes('safra')) return null
+  const search = normalized.includes('cafe') ? 'cafe' : message.split(/safra/i)[1]?.trim()
+  if (!search) return null
+  return findSingleByName(() =>
+    prisma.safra.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        name: { contains: search, mode: 'insensitive' as const },
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+async function resolveEmployee(companyId: string, message: string) {
+  const match = message.match(/(?:para|funcion[aá]rio)\s+(?:o\s+|a\s+)?([A-Za-zÀ-ÿ]+)/i)
+  const name = match?.[1]
+  if (!name) return null
+  return findSingleByName(() =>
+    prisma.employee.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        name: { contains: name, mode: 'insensitive' as const },
+      },
+      select: { id: true, name: true },
+      take: 2,
+    }),
+  )
+}
+
+async function buildDraft(companyId: string, input: AssistantChatDto): Promise<AssistantDraft | null> {
+  const intent = getDraftIntent(input.message)
+  if (!intent) return null
+
+  const amount = extractAmount(input.message)
+  const today = makeDate()
+  const missingFields: string[] = []
+
+  if (!amount || amount <= 0) missingFields.push('amount')
+
+  if (intent === 'CREATE_EXPENSE') {
+    const category = await resolveCategory(companyId, input.message)
+    const safra = await resolveSafra(companyId, input.message)
+    const status = normalizeText(input.message).includes('paguei') ? 'PAID' : 'PENDING'
+    if (!category) missingFields.push('categoryId')
+    if (status === 'PAID') missingFields.push('accountId')
+
+    return {
+      draftType: 'CREATE_EXPENSE',
+      payload: {
+        description: descriptionFromMessage(input.message, 'Despesa'),
+        amount: amount ?? 0,
+        date: today,
+        dueDate: status === 'PENDING' ? extractDueDate(input.message) : undefined,
+        paidAt: status === 'PAID' ? today : undefined,
+        status,
+        categoryId: category?.id,
+        safraId: safra?.id,
+      },
+      missingFields: [...new Set(missingFields)],
+      confirmationRequired: true,
+    }
+  }
+
+  if (intent === 'CREATE_BILL') {
+    const category = await resolveCategory(companyId, input.message)
+    const safra = await resolveSafra(companyId, input.message)
+    if (!amount) missingFields.push('amount')
+
+    return {
+      draftType: 'CREATE_BILL',
+      payload: {
+        description: descriptionFromMessage(input.message, 'Boleto'),
+        amount: amount ?? 0,
+        dueDate: extractDueDate(input.message),
+        status: 'PENDING',
+        categoryId: category?.id,
+        safraId: safra?.id,
+      },
+      missingFields: [...new Set(missingFields)],
+      confirmationRequired: true,
+    }
+  }
+
+  const employee = await resolveEmployee(companyId, input.message)
+  if (!employee) missingFields.push('employeeId')
+  missingFields.push('accountId')
+  const date = today
+  return {
+    draftType: 'CREATE_EMPLOYEE_PAYMENT',
+    payload: {
+      employeeId: employee?.id,
+      type: normalizeText(input.message).includes('diaria') ? 'DAILY_WAGE' : 'ADVANCE',
+      amount: amount ?? 0,
+      date,
+      referenceMonth: date.getMonth() + 1,
+      referenceYear: date.getFullYear(),
+      notes: descriptionFromMessage(input.message, 'Pagamento de funcionário'),
+    },
+    missingFields: [...new Set(missingFields)],
+    confirmationRequired: true,
+  }
 }
 
 function extractSafraSearch(message: string) {
@@ -381,6 +589,16 @@ export const AssistantService = {
       }
     }
 
+    const draft = await buildDraft(companyId, input)
+    if (draft) {
+      return {
+        kind: 'DRAFT',
+        answer: 'Montei um rascunho para você revisar.',
+        sources: [],
+        draft,
+      }
+    }
+
     if (isWriteAction(input.message)) {
       return {
         kind: 'NEEDS_CLARIFICATION',
@@ -407,6 +625,34 @@ export const AssistantService = {
       answer: buildAnswer(routedIntent, result.data),
       sources: mergeSources(result.sources),
       data: result.data,
+    }
+  },
+
+  async confirmDraft(companyId: string, input: ConfirmAssistantDraftDto, req: Request) {
+    const { draft } = input
+    if (draft.missingFields.length > 0) {
+      throw AppError.badRequest(`Preencha os campos obrigatórios antes de confirmar: ${draft.missingFields.join(', ')}`)
+    }
+
+    if (draft.draftType === 'CREATE_EXPENSE') {
+      if (!draft.payload.categoryId) throw AppError.badRequest('categoryId é obrigatório para confirmar despesa')
+      return {
+        draftType: draft.draftType,
+        created: await ExpenseService.create(companyId, { ...draft.payload, categoryId: draft.payload.categoryId }, req),
+      }
+    }
+
+    if (draft.draftType === 'CREATE_BILL') {
+      return {
+        draftType: draft.draftType,
+        created: await BillService.create(companyId, draft.payload, req),
+      }
+    }
+
+    if (!draft.payload.employeeId) throw AppError.badRequest('employeeId é obrigatório para confirmar pagamento')
+    return {
+      draftType: draft.draftType,
+      created: await EmployeePaymentService.create(companyId, { ...draft.payload, employeeId: draft.payload.employeeId }, req),
     }
   },
 }

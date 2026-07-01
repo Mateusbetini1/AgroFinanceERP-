@@ -11,6 +11,7 @@ import { InlineAlert } from '@/components/feedback/inline-alert'
 import { Textarea } from '@/components/ui/textarea'
 import { cn, getApiErrorMessage } from '@/lib/utils'
 import { sendAssistantMessage } from '../api'
+import { AssistantDraftCard } from './assistant-draft-card'
 import type { AssistantMessage } from '../types'
 
 const suggestions = [
@@ -59,6 +60,7 @@ export function AssistantChat() {
           content: response.answer,
           kind: response.kind,
           sources: response.sources,
+          draft: response.draft,
         },
       ])
     },
@@ -92,6 +94,23 @@ export function AssistantChat() {
         recentMessages,
       },
     })
+  }
+
+  function removeDraft(messageId: string) {
+    setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, draft: undefined } : item)))
+  }
+
+  function markDraftConfirmed(messageId: string) {
+    setMessages((current) => [
+      ...current.map((item) => (item.id === messageId ? { ...item, draft: undefined } : item)),
+      {
+        id: createId(),
+        role: 'assistant',
+        content: 'Rascunho confirmado e lançamento criado com sucesso.',
+        kind: 'ANSWER',
+        sources: [],
+      },
+    ])
   }
 
   return (
@@ -133,6 +152,13 @@ export function AssistantChat() {
                       ),
                     )}
                   </div>
+                )}
+                {item.draft && (
+                  <AssistantDraftCard
+                    draft={item.draft}
+                    onCancel={() => removeDraft(item.id)}
+                    onConfirmed={() => markDraftConfirmed(item.id)}
+                  />
                 )}
               </div>
             ))}
