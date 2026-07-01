@@ -402,7 +402,7 @@ function withMissingFields(draft: AssistantDraft): AssistantDraft {
 
 async function completeDraft(companyId: string, input: AssistantChatDto): Promise<AssistantDraft | null> {
   const currentDraft = input.context?.currentDraft
-  if (!currentDraft || currentDraft.missingFields.length === 0) return null
+  if (!currentDraft) return null
 
   const [category, account, supplier, safra, employee, product] = await Promise.all([
     resolveCategory(companyId, input.message),
@@ -414,18 +414,42 @@ async function completeDraft(companyId: string, input: AssistantChatDto): Promis
   ])
 
   const payload = { ...currentDraft.payload } as Record<string, unknown>
+  let changed = false
   if (currentDraft.draftType !== 'CREATE_EMPLOYEE_PAYMENT') {
-    if (category) payload.categoryId = category.id
-    if (supplier) payload.supplierId = supplier.id
-    if (safra) payload.safraId = safra.id
+    if (category && payload.categoryId !== category.id) {
+      payload.categoryId = category.id
+      changed = true
+    }
+    if (supplier && payload.supplierId !== supplier.id) {
+      payload.supplierId = supplier.id
+      changed = true
+    }
+    if (safra && payload.safraId !== safra.id) {
+      payload.safraId = safra.id
+      changed = true
+    }
   }
-  if (account) payload.accountId = account.id
-  if (currentDraft.draftType === 'CREATE_EMPLOYEE_PAYMENT' && employee) payload.employeeId = employee.id
-  if (currentDraft.draftType === 'CREATE_REVENUE' && product) payload.productId = product.id
+  if (account && payload.accountId !== account.id) {
+    payload.accountId = account.id
+    changed = true
+  }
+  if (currentDraft.draftType === 'CREATE_EMPLOYEE_PAYMENT' && employee && payload.employeeId !== employee.id) {
+    payload.employeeId = employee.id
+    changed = true
+  }
+  if (currentDraft.draftType === 'CREATE_REVENUE' && product && payload.productId !== product.id) {
+    payload.productId = product.id
+    changed = true
+  }
   if (currentDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
     const firstDueDate = extractFirstDueDate(input.message)
-    if (firstDueDate) payload.firstDueDate = firstDueDate
+    if (firstDueDate && String(payload.firstDueDate) !== String(firstDueDate)) {
+      payload.firstDueDate = firstDueDate
+      changed = true
+    }
   }
+
+  if (!changed) return null
 
   return withMissingFields({ ...currentDraft, payload } as AssistantDraft)
 }
@@ -928,7 +952,7 @@ export const AssistantService = {
     if (isWriteAction(input.message)) {
       return {
         kind: 'NEEDS_CLARIFICATION',
-        answer: 'Nesta versão eu só consulto dados existentes. Não crio, edito, pago ou excluo lançamentos.',
+        answer: 'Posso consultar dados e montar rascunhos de lançamentos. Nada é salvo sem sua confirmação.',
         sources: [],
       }
     }

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Trash2 } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn, getApiErrorMessage } from '@/lib/utils'
 import { sendAssistantMessage } from '../api'
 import { AssistantDraftCard } from './assistant-draft-card'
-import type { AssistantDraft, AssistantMessage } from '../types'
+import type { AssistantDraft, AssistantDraftDestination, AssistantMessage } from '../types'
 
 const suggestions = [
   'O que vence nos próximos 7 dias?',
@@ -22,8 +22,38 @@ const suggestions = [
   'Como está meu caixa nos próximos 30 dias?',
 ]
 
+const initialAssistantMessage = 'Faça perguntas ou monte rascunhos de lançamentos. Nada é salvo sem sua confirmação.'
+
+const draftDestinations: Record<AssistantDraft['draftType'], AssistantDraftDestination> = {
+  CREATE_EXPENSE: { draftType: 'CREATE_EXPENSE', label: 'Despesas', route: '/expenses' },
+  CREATE_BILL: { draftType: 'CREATE_BILL', label: 'Boletos', route: '/bills' },
+  CREATE_BILL_INSTALLMENT_GROUP: {
+    draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+    label: 'Parcelamentos',
+    route: '/bills/installments',
+  },
+  CREATE_REVENUE: { draftType: 'CREATE_REVENUE', label: 'Receitas', route: '/revenues' },
+  CREATE_EMPLOYEE_PAYMENT: {
+    draftType: 'CREATE_EMPLOYEE_PAYMENT',
+    label: 'Pagamentos de funcionários',
+    route: '/employee-payments',
+  },
+}
+
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function createInitialMessages(): AssistantMessage[] {
+  return [
+    {
+      id: createId(),
+      role: 'assistant',
+      content: initialAssistantMessage,
+      kind: 'ANSWER',
+      sources: [],
+    },
+  ]
 }
 
 function contextFromMessages(messages: AssistantMessage[]) {
@@ -39,7 +69,7 @@ function contextFromMessages(messages: AssistantMessage[]) {
 function getOpenDraft(messages: AssistantMessage[]): { messageId: string; draft: AssistantDraft } | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const item = messages[index]
-    if (item.draft?.missingFields.length) return { messageId: item.id, draft: item.draft }
+    if (item.draft && !item.confirmedDraft) return { messageId: item.id, draft: item.draft }
   }
   return null
 }
@@ -47,15 +77,7 @@ function getOpenDraft(messages: AssistantMessage[]): { messageId: string; draft:
 export function AssistantChat() {
   const pathname = usePathname()
   const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState<AssistantMessage[]>([
-    {
-      id: createId(),
-      role: 'assistant',
-      content: 'Faça uma pergunta ou peça para montar um rascunho. Nada é salvo sem confirmação.',
-      kind: 'ANSWER',
-      sources: [],
-    },
-  ])
+  const [messages, setMessages] = useState<AssistantMessage[]>(() => createInitialMessages())
 
   const mutation = useMutation({
     mutationFn: ({
@@ -133,28 +155,49 @@ export function AssistantChat() {
     setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, draft: undefined } : item)))
   }
 
-  function markDraftConfirmed(messageId: string) {
-    setMessages((current) => [
-      ...current.map((item) => (item.id === messageId ? { ...item, draft: undefined } : item)),
-      {
-        id: createId(),
-        role: 'assistant',
-        content: 'Rascunho confirmado e lançamento criado com sucesso.',
-        kind: 'ANSWER',
-        sources: [],
-      },
-    ])
+  function markDraftConfirmed(messageId: string, draftType: AssistantDraft['draftType']) {
+    const destination = draftDestinations[draftType]
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === messageId
+          ? {
+              ...item,
+              content: `Lançamento criado com sucesso. Ver em ${destination.label}.`,
+              kind: 'ANSWER',
+              sources: [{ label: `Ver em ${destination.label}`, route: destination.route }],
+              confirmedDraft: destination,
+            }
+          : item,
+      ),
+    )
   }
 
   function updateDraft(messageId: string, draft: AssistantDraft) {
     setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, draft } : item)))
   }
 
+  function clearConversation() {
+    if (mutation.isPending) return
+    setMessage('')
+    setMessages(createInitialMessages())
+  }
+
   return (
     <div className="grid min-h-[calc(100vh-9rem)] gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <Card className="flex min-h-[520px] flex-col">
-        <CardHeader>
+        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base">Conversa</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            disabled={mutation.isPending}
+            onClick={clearConversation}
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar conversa
+          </Button>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-4">
           <div className="flex-1 space-y-3 overflow-y-auto">
@@ -164,10 +207,10 @@ export function AssistantChat() {
                 className={cn(
                   'rounded-lg border p-3 text-sm',
                   item.role === 'user'
-                    ? 'ml-8 bg-primary text-primary-foreground'
+                    ? 'ml-0 bg-primary text-primary-foreground sm:ml-8'
                     : item.kind === 'ERROR'
-                      ? 'mr-8 border-destructive/20 bg-destructive/10 text-destructive'
-                      : 'mr-8 bg-muted/30 text-foreground',
+                      ? 'mr-0 border-destructive/20 bg-destructive/10 text-destructive sm:mr-8'
+                      : 'mr-0 bg-muted/30 text-foreground sm:mr-8',
                 )}
               >
                 <p className="whitespace-pre-wrap">{item.content}</p>
@@ -178,7 +221,7 @@ export function AssistantChat() {
                         <Link
                           key={`${source.label}:${source.route}`}
                           href={source.route}
-                          className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-accent"
+                          className="rounded-md border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-accent"
                         >
                           {source.label}
                         </Link>
@@ -193,15 +236,16 @@ export function AssistantChat() {
                 {item.draft && (
                   <AssistantDraftCard
                     draft={item.draft}
+                    confirmedDestination={item.confirmedDraft}
                     onChange={(draft) => updateDraft(item.id, draft)}
                     onCancel={() => removeDraft(item.id)}
-                    onConfirmed={() => markDraftConfirmed(item.id)}
+                    onConfirmed={(draftType) => markDraftConfirmed(item.id, draftType)}
                   />
                 )}
               </div>
             ))}
             {mutation.isPending && (
-              <div className="mr-8 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <div className="mr-0 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground sm:mr-8">
                 Consultando dados...
               </div>
             )}
@@ -214,6 +258,7 @@ export function AssistantChat() {
               placeholder="Pergunte sobre boletos, caixa, receitas, despesas ou safras..."
               rows={3}
               maxLength={1000}
+              className="min-h-[96px] text-base sm:text-sm"
             />
             <Button type="button" className="h-11 w-full" disabled={!canSubmit} loading={mutation.isPending} onClick={() => submit()}>
               <Send className="h-4 w-4" />
@@ -225,7 +270,7 @@ export function AssistantChat() {
 
       <aside className="space-y-4">
         <InlineAlert tone="success">
-          O assistente monta rascunhos e consulta dados. Nada é salvo sem confirmação.
+          O assistente consulta dados e monta rascunhos de lançamentos. Nada é salvo sem sua confirmação.
         </InlineAlert>
         <Card>
           <CardHeader>

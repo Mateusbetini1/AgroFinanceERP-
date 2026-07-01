@@ -244,6 +244,40 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.revenue.create).not.toHaveBeenCalled()
   })
 
+  it('atualiza rascunho completo aberto por mensagem quando reconhece novo campo', async () => {
+    prismaMock.category.findMany.mockResolvedValue([])
+    prismaMock.account.findMany.mockResolvedValue([{ id: '99999999-9999-4999-8999-999999999999', name: 'Caixa' }])
+    prismaMock.supplier.findMany.mockResolvedValue([])
+    prismaMock.safra.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.product.findMany.mockResolvedValue([])
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'troca a conta para Caixa',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_EXPENSE',
+          payload: {
+            description: 'Combustivel',
+            amount: 300,
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'PAID',
+            categoryId: '11111111-1111-4111-8111-111111111111',
+            accountId: '33333333-3333-4333-8333-333333333333',
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload).toEqual(expect.objectContaining({ accountId: '99999999-9999-4999-8999-999999999999' }))
+    expect(result.draft?.missingFields).toEqual([])
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.expense.create).not.toHaveBeenCalled()
+  })
+
   it('complementa rascunho aberto de parcelamento', async () => {
     prismaMock.supplier.findMany.mockResolvedValue([{ id: '55555555-5555-4555-8555-555555555555', name: 'Casa Agricola' }])
     prismaMock.category.findMany.mockResolvedValue([{ id: '11111111-1111-4111-8111-111111111111', name: 'Defensivos' }])

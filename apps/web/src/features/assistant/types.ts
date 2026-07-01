@@ -20,6 +20,7 @@ export type AssistantMessage = {
   kind?: AssistantKind
   sources?: AssistantSource[]
   draft?: AssistantDraft
+  confirmedDraft?: AssistantDraftDestination
 }
 
 export type AssistantChatContext = {
@@ -41,4 +42,10 @@ export type AssistantDraft = {
   payload: Record<string, unknown>
   missingFields: string[]
   confirmationRequired: true
+}
+
+export type AssistantDraftDestination = {
+  draftType: AssistantDraft['draftType']
+  label: string
+  route: string
 }
