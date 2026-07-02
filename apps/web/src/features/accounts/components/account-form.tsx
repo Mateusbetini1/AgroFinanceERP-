@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldError, FormActions, OptionalSection, RequiredMark, formControlClass } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
@@ -75,30 +75,22 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="account-name">Nome</Label>
-          <Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} required />
+          <Label htmlFor="account-name">
+            Nome
+            <RequiredMark />
+          </Label>
+          <Input id="account-name" className={formControlClass} value={name} onChange={(event) => setName(event.target.value)} required />
+          <FieldError message={error?.includes('nome da conta') ? error : null} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="account-type">Tipo</Label>
-          <Select id="account-type" value={type} onChange={(event) => setType(event.target.value as AccountType)}>
+          <Label htmlFor="account-type">
+            Tipo
+            <RequiredMark />
+          </Label>
+          <Select id="account-type" className={formControlClass} value={type} onChange={(event) => setType(event.target.value as AccountType)}>
             <option value="CASH">Caixa</option>
             <option value="BANK">Banco</option>
           </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="account-bank">Banco</Label>
-          <Input id="account-bank" value={bankName} onChange={(event) => setBankName(event.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="account-agency">Agência</Label>
-          <Input id="account-agency" value={agency} onChange={(event) => setAgency(event.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="account-number">Número</Label>
-          <Input id="account-number" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} />
         </div>
       </div>
 
@@ -108,12 +100,36 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
           <Input
             id="account-initial"
             type="number"
+            inputMode="decimal"
             step="0.01"
+            className={formControlClass}
             value={initialBalance}
             onChange={(event) => setInitialBalance(event.target.value)}
           />
         </div>
       )}
+
+      <OptionalSection>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="account-bank">Banco</Label>
+            <Input id="account-bank" className={formControlClass} value={bankName} onChange={(event) => setBankName(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="account-agency">Agência</Label>
+            <Input id="account-agency" className={formControlClass} value={agency} onChange={(event) => setAgency(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="account-number">Número</Label>
+            <Input
+              id="account-number"
+              className={formControlClass}
+              value={accountNumber}
+              onChange={(event) => setAccountNumber(event.target.value)}
+            />
+          </div>
+        </div>
+      </OptionalSection>
 
       {initialValue && (
         <label className="flex items-center gap-2 text-sm">
@@ -122,20 +138,13 @@ export function AccountForm({ initialValue, isSubmitting, onSubmit, onCancel }: 
         </label>
       )}
 
-      {error && (
+      {error && !error.includes('nome da conta') && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

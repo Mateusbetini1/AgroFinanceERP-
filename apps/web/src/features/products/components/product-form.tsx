@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldError, FormActions, OptionalSection, RequiredMark, formControlClass, formTextareaClass } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
@@ -81,23 +81,21 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="space-y-2">
-        <Label htmlFor="product-name">Nome</Label>
-        <Input id="product-name" value={name} onChange={(event) => setName(event.target.value)} required />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="product-description">Descrição</Label>
-        <Textarea
-          id="product-description"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
+        <Label htmlFor="product-name">
+          Nome
+          <RequiredMark />
+        </Label>
+        <Input id="product-name" className={formControlClass} value={name} onChange={(event) => setName(event.target.value)} required />
+        <FieldError message={error?.includes('nome do produto') ? error : null} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="product-unit">Unidade</Label>
-          <Select id="product-unit" value={unit} onChange={(event) => setUnit(event.target.value)}>
+          <Label htmlFor="product-unit">
+            Unidade
+            <RequiredMark />
+          </Label>
+          <Select id="product-unit" className={formControlClass} value={unit} onChange={(event) => setUnit(event.target.value)}>
             {units.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
@@ -108,7 +106,7 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
 
         <div className="space-y-2">
           <Label htmlFor="product-category">Categoria</Label>
-          <Select id="product-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          <Select id="product-category" className={formControlClass} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
             <option value="">Sem categoria</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
@@ -119,6 +117,18 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
         </div>
       </div>
 
+      <OptionalSection>
+        <div className="space-y-2">
+          <Label htmlFor="product-description">Descrição</Label>
+          <Textarea
+            id="product-description"
+            className={formTextareaClass}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+      </OptionalSection>
+
       {initialValue && (
         <label className="flex items-center gap-2 text-sm">
           <Checkbox checked={active} onChange={(event) => setActive(event.currentTarget.checked)} />
@@ -126,20 +136,13 @@ export function ProductForm({ initialValue, categories, isSubmitting, onSubmit, 
         </label>
       )}
 
-      {error && (
+      {error && !error.includes('nome do produto') && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

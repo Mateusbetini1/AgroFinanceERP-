@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { FieldError, FormActions, OptionalSection, RequiredMark, formControlClass, formTextareaClass } from '@/components/ui/form'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,8 +12,8 @@ import type { FarmLocationPayload } from '../api'
 
 const typeOptions: Array<{ value: FarmLocationType; label: string }> = [
   { value: 'GREENHOUSE', label: 'Estufa' },
-  { value: 'PLOT', label: 'Talhao' },
-  { value: 'FIELD', label: 'Campo/Area' },
+  { value: 'PLOT', label: 'Talhão' },
+  { value: 'FIELD', label: 'Campo/Área' },
 ]
 
 interface FarmLocationFormProps {
@@ -43,8 +43,8 @@ export function FarmLocationForm({ initialValue, isSubmitting, onSubmit, onCance
   function validate() {
     const parsedArea = area === '' ? null : Number(area)
 
-    if (name.trim().length < 2) return 'Informe o nome do local com pelo menos 2 caracteres.'
-    if (!type) return 'Selecione o tipo do local.'
+    if (name.trim().length < 2) return 'Informe o nome do talhão/local com pelo menos 2 caracteres.'
+    if (!type) return 'Selecione o tipo do talhão/local.'
     if (parsedArea !== null && (!Number.isFinite(parsedArea) || parsedArea <= 0)) {
       return 'Area deve ser um numero maior que zero.'
     }
@@ -100,14 +100,16 @@ export function FarmLocationForm({ initialValue, isSubmitting, onSubmit, onCance
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="farm-location-name">Nome do local/area</Label>
-          <Input id="farm-location-name" value={name} onChange={(event) => setName(event.target.value)} required />
+          <Label htmlFor="farm-location-name">Nome do talhão/local<RequiredMark /></Label>
+          <Input id="farm-location-name" className={formControlClass} value={name} onChange={(event) => setName(event.target.value)} required />
+          <FieldError message={error?.includes('nome do talhão/local') ? error : null} />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="farm-location-type">Tipo</Label>
+          <Label htmlFor="farm-location-type">Tipo<RequiredMark /></Label>
           <Select
             id="farm-location-type"
+            className={formControlClass}
             value={type}
             onChange={(event) => setType(event.target.value as FarmLocationType)}
             required
@@ -123,21 +125,25 @@ export function FarmLocationForm({ initialValue, isSubmitting, onSubmit, onCance
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="farm-location-area">Area</Label>
+        <Label htmlFor="farm-location-area">Área</Label>
         <Input
           id="farm-location-area"
           type="number"
+          inputMode="decimal"
           min="0.01"
           step="0.01"
+          className={formControlClass}
           value={area}
           onChange={(event) => setArea(event.target.value)}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="farm-location-notes">Observacoes</Label>
-        <Textarea id="farm-location-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </div>
+      <OptionalSection>
+        <div className="space-y-2">
+          <Label htmlFor="farm-location-notes">Observações</Label>
+          <Textarea id="farm-location-notes" className={formTextareaClass} value={notes} onChange={(event) => setNotes(event.target.value)} />
+        </div>
+      </OptionalSection>
 
       {initialValue && (
         <label className="flex items-center gap-2 text-sm">
@@ -146,20 +152,13 @@ export function FarmLocationForm({ initialValue, isSubmitting, onSubmit, onCance
         </label>
       )}
 
-      {error && (
+      {error && !error.includes('nome do talhão/local') && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

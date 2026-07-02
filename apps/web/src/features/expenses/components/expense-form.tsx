@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { FormActions, OptionalSection } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
@@ -260,14 +260,16 @@ export function ExpenseForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="expense-attachment">URL do anexo</Label>
-        <Textarea
-          id="expense-attachment"
-          value={attachmentUrl}
-          onChange={(event) => setAttachmentUrl(event.target.value)}
-        />
-      </div>
+      <OptionalSection>
+        <div className="space-y-2">
+          <Label htmlFor="expense-attachment">Link do anexo</Label>
+          <Textarea
+            id="expense-attachment"
+            value={attachmentUrl}
+            onChange={(event) => setAttachmentUrl(event.target.value)}
+          />
+        </div>
+      </OptionalSection>
 
       {status === 'PAID' && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -287,14 +289,7 @@ export function ExpenseForm({
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

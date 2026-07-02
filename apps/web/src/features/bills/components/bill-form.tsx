@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { FormActions, OptionalSection } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
@@ -414,10 +415,12 @@ export function BillForm({ initialValue, suppliers, accounts, categories, safras
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="bill-file">URL do arquivo</Label>
-        <Textarea id="bill-file" value={fileUrl} onChange={(event) => setFileUrl(event.target.value)} />
-      </div>
+      <OptionalSection>
+        <div className="space-y-2">
+          <Label htmlFor="bill-file">Link do arquivo</Label>
+          <Textarea id="bill-file" value={fileUrl} onChange={(event) => setFileUrl(event.target.value)} />
+        </div>
+      </OptionalSection>
 
       {isInstallmentsMode && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -447,14 +450,7 @@ export function BillForm({ initialValue, suppliers, accounts, categories, safras
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

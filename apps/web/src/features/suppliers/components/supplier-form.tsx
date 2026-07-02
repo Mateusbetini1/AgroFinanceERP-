@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { FieldError, FormActions, OptionalSection, RequiredMark, formControlClass, formTextareaClass } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -77,50 +77,60 @@ export function SupplierForm({ initialValue, isSubmitting, onSubmit, onCancel }:
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="supplier-name">Nome</Label>
-          <Input id="supplier-name" value={name} onChange={(event) => setName(event.target.value)} required />
+          <Label htmlFor="supplier-name">
+            Nome
+            <RequiredMark />
+          </Label>
+          <Input id="supplier-name" className={formControlClass} value={name} onChange={(event) => setName(event.target.value)} required />
+          <FieldError message={error?.includes('nome do fornecedor') ? error : null} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="supplier-document">CPF/CNPJ</Label>
-          <Input id="supplier-document" value={document} onChange={(event) => setDocument(event.target.value)} required />
+          <Label htmlFor="supplier-document">
+            CPF/CNPJ
+            <RequiredMark />
+          </Label>
+          <Input
+            id="supplier-document"
+            className={formControlClass}
+            inputMode="numeric"
+            value={document}
+            onChange={(event) => setDocument(event.target.value)}
+            required
+          />
+          <FieldError message={error?.includes('CPF ou CNPJ') ? error : null} />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="supplier-phone">Telefone</Label>
-          <Input id="supplier-phone" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <Input id="supplier-phone" className={formControlClass} inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="supplier-email">Email</Label>
-          <Input id="supplier-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          <Input id="supplier-email" className={formControlClass} type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="supplier-contact">Contato</Label>
-        <Input id="supplier-contact" value={contactName} onChange={(event) => setContactName(event.target.value)} />
-      </div>
+      <OptionalSection>
+        <div className="space-y-2">
+          <Label htmlFor="supplier-contact">Contato</Label>
+          <Input id="supplier-contact" className={formControlClass} value={contactName} onChange={(event) => setContactName(event.target.value)} />
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="supplier-notes">Observações</Label>
-        <Textarea id="supplier-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-      </div>
+        <div className="space-y-2">
+          <Label htmlFor="supplier-notes">Observações</Label>
+          <Textarea id="supplier-notes" className={formTextareaClass} value={notes} onChange={(event) => setNotes(event.target.value)} />
+        </div>
+      </OptionalSection>
 
-      {error && (
+      {error && !error.includes('nome do fornecedor') && !error.includes('CPF ou CNPJ') && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </div>
+      <FormActions isSubmitting={isSubmitting} onCancel={onCancel} />
     </form>
   )
 }
