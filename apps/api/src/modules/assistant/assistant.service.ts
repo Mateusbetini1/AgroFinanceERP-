@@ -160,23 +160,101 @@ function makeDate(day?: number | null) {
   return candidate
 }
 
-function extractDueDate(message: string) {
+const MONTH_NAMES: Record<string, number> = {
+  janeiro: 1,
+  fevereiro: 2,
+  marco: 3,
+  abril: 4,
+  maio: 5,
+  junho: 6,
+  julho: 7,
+  agosto: 8,
+  setembro: 9,
+  outubro: 10,
+  novembro: 11,
+  dezembro: 12,
+}
+
+function currentDayStart() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function buildCoherentDate(day: number, month: number, year?: number | null) {
+  if (!Number.isInteger(day) || !Number.isInteger(month) || day < 1 || month < 1 || month > 12) return null
+
+  const today = currentDayStart()
+  const candidateYear = year ?? today.getFullYear()
+  const candidate = new Date(candidateYear, month - 1, day)
+  if (candidate.getFullYear() !== candidateYear || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) return null
+
+  if (!year && candidate < today) {
+    return new Date(candidateYear + 1, month - 1, day)
+  }
+  return candidate
+}
+
+function parseYear(value?: string) {
+  if (!value) return null
+  return Number(value.length === 2 ? `20${value}` : value)
+}
+
+function extractMonthOnly(message: string) {
+  const normalized = normalizeText(message)
+  const numeric = normalized.match(/\bmes\s+(\d{1,2})\b/)
+  if (numeric) return Number(numeric[1])
+
+  const named = normalized.match(new RegExp(`\\b(?:em|para|de)\\s+(${Object.keys(MONTH_NAMES).join('|')})\\b`))
+  return named ? MONTH_NAMES[named[1]] : null
+}
+
+function extractNaturalDate(message: string, fallbackDay?: number | null) {
   const normalized = normalizeText(message)
   const iso = message.match(/(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/)
   if (iso) {
     const day = Number(iso[1])
-    const month = Number(iso[2]) - 1
-    const year = iso[3] ? Number(iso[3].length === 2 ? `20${iso[3]}` : iso[3]) : new Date().getFullYear()
-    return new Date(year, month, day)
+    const month = Number(iso[2])
+    return buildCoherentDate(day, month, parseYear(iso[3]))
   }
-  const dayMatch = normalized.match(/(?:dia|vencer dia|vence dia)\s+(\d{1,2})/)
-  return makeDate(dayMatch ? Number(dayMatch[1]) : null)
+
+  const dayMonth = normalized.match(/(?:dia\s+)?(\d{1,2})\s+(?:do\s+)?mes\s+(\d{1,2})(?:\s+(?:de|do)\s+(\d{2,4}))?/)
+  if (dayMonth) return buildCoherentDate(Number(dayMonth[1]), Number(dayMonth[2]), parseYear(dayMonth[3]))
+
+  const shortDayMonth = normalized.match(/\b(\d{1,2})\s+do\s+(\d{1,2})(?:\s+(?:de|do)\s+(\d{2,4}))?\b/)
+  if (shortDayMonth) return buildCoherentDate(Number(shortDayMonth[1]), Number(shortDayMonth[2]), parseYear(shortDayMonth[3]))
+
+  const monthNames = Object.keys(MONTH_NAMES).join('|')
+  const namedMonth = normalized.match(new RegExp(`(?:dia\\s+)?(\\d{1,2})\\s+de\\s+(${monthNames})(?:\\s+de\\s+(\\d{2,4}))?`))
+  if (namedMonth) return buildCoherentDate(Number(namedMonth[1]), MONTH_NAMES[namedMonth[2]], parseYear(namedMonth[3]))
+
+  const monthOnly = extractMonthOnly(message)
+  if (monthOnly && fallbackDay) return buildCoherentDate(fallbackDay, monthOnly)
+
+  const dayMatch = normalized.match(/(?:dia|vencer dia|vence dia|vencendo dia)\s+(\d{1,2})/)
+  if (dayMatch) return makeDate(Number(dayMatch[1]))
+
+  return null
 }
 
-function extractFirstDueDate(message: string) {
+function extractDueDate(message: string) {
+  return extractNaturalDate(message)
+}
+
+function extractFirstDueDate(message: string, currentFirstDueDate?: unknown) {
   const normalized = normalizeText(message)
-  if (!normalized.includes('venc') && !normalized.includes('primeira') && !normalized.includes('dia ')) return null
-  return extractDueDate(message)
+  const hasShortDate = /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(message)
+  if (!hasShortDate && !hasFirstDueDateUpdateIntent(message)) {
+    return null
+  }
+
+  const currentDate = currentFirstDueDate ? new Date(currentFirstDueDate as string | Date) : null
+  const fallbackDay = currentDate && !Number.isNaN(currentDate.getTime()) ? currentDate.getDate() : null
+  return extractNaturalDate(message, fallbackDay)
+}
+
+function hasFirstDueDateUpdateIntent(message: string) {
+  const normalized = normalizeText(message)
+  return normalized.includes('venc') || normalized.includes('primeira') || normalized.includes('parcela') || normalized.includes('dia ') || normalized.includes('mes ')
 }
 
 function extractInstallmentCount(message: string) {
@@ -442,10 +520,13 @@ async function completeDraft(companyId: string, input: AssistantChatDto): Promis
     changed = true
   }
   if (currentDraft.draftType === 'CREATE_BILL_INSTALLMENT_GROUP') {
-    const firstDueDate = extractFirstDueDate(input.message)
+    const firstDueDate = extractFirstDueDate(input.message, payload.firstDueDate)
     if (firstDueDate && String(payload.firstDueDate) !== String(firstDueDate)) {
       payload.firstDueDate = firstDueDate
       changed = true
+    }
+    if (!firstDueDate && hasFirstDueDateUpdateIntent(input.message) && !payload.firstDueDate) {
+      return withMissingFields({ ...currentDraft, payload } as AssistantDraft)
     }
   }
 
@@ -477,7 +558,7 @@ async function buildDraft(companyId: string, input: AssistantChatDto): Promise<A
         description: descriptionFromMessage(input.message, 'Despesa'),
         amount: amount ?? 0,
         date: today,
-        dueDate: status === 'PENDING' ? extractDueDate(input.message) : undefined,
+        dueDate: status === 'PENDING' ? (extractDueDate(input.message) ?? undefined) : undefined,
         paidAt: status === 'PAID' ? today : undefined,
         status,
         categoryId: category?.id,
@@ -498,7 +579,7 @@ async function buildDraft(companyId: string, input: AssistantChatDto): Promise<A
       payload: {
         description: descriptionFromMessage(input.message, 'Boleto'),
         amount: amount ?? 0,
-        dueDate: extractDueDate(input.message),
+        dueDate: extractDueDate(input.message) ?? undefined,
         status: 'PENDING',
         categoryId: category?.id,
         safraId: safra?.id,
@@ -546,7 +627,7 @@ async function buildDraft(companyId: string, input: AssistantChatDto): Promise<A
       ? 'PENDING'
       : 'RECEIVED'
     const date = today
-    const dueDate = status === 'PENDING' ? extractDueDate(input.message) : undefined
+    const dueDate = status === 'PENDING' ? (extractDueDate(input.message) ?? undefined) : undefined
     if (!product) missingFields.push('productId')
     if (status === 'RECEIVED' && !account) missingFields.push('accountId')
 
@@ -995,9 +1076,10 @@ export const AssistantService = {
     }
 
     if (draft.draftType === 'CREATE_BILL') {
+      if (!draft.payload.dueDate) throw AppError.badRequest('dueDate Ã© obrigatÃ³rio para confirmar boleto')
       return {
         draftType: draft.draftType,
-        created: await BillService.create(companyId, draft.payload, req),
+        created: await BillService.create(companyId, { ...draft.payload, dueDate: draft.payload.dueDate }, req),
       }
     }
 

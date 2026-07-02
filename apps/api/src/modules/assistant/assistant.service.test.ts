@@ -26,9 +26,28 @@ function expectTool(companyId: string, tool: AssistantToolCall['tool']) {
   expect(executeAssistantTool).toHaveBeenCalledWith(companyId, expect.objectContaining({ tool }))
 }
 
+function expectDateParts(value: unknown, year: number, month: number, day: number) {
+  expect(value).toBeInstanceOf(Date)
+  const date = value as Date
+  expect(date.getFullYear()).toBe(year)
+  expect(date.getMonth() + 1).toBe(month)
+  expect(date.getDate()).toBe(day)
+}
+
+function mockEmptyDraftMatches() {
+  prismaMock.category.findMany.mockResolvedValue([])
+  prismaMock.account.findMany.mockResolvedValue([])
+  prismaMock.supplier.findMany.mockResolvedValue([])
+  prismaMock.safra.findMany.mockResolvedValue([])
+  prismaMock.employee.findMany.mockResolvedValue([])
+  prismaMock.product.findMany.mockResolvedValue([])
+}
+
 describe('AssistantService.chat', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 1, 12))
     vi.stubGlobal('fetch', vi.fn())
     resetPrismaMock()
     ;(env as typeof env).AI_ENABLED = true
@@ -100,6 +119,63 @@ describe('AssistantService.chat', () => {
     )
     expect(executeAssistantTool).not.toHaveBeenCalled()
     expect(prismaMock.billGroup.create).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('interpreta primeira parcela dia 10 do mes 10 como 10/10/2026', async () => {
+    const result = await AssistantService.chat('company-1', {
+      message: 'Crie um boleto de R$ 4000 dividido em 4 vezes, primeira parcela dia 10 do mes 10.',
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.draftType).toBe('CREATE_BILL_INSTALLMENT_GROUP')
+    expect(result.draft?.payload).toEqual(expect.objectContaining({ totalAmount: 4000, installmentCount: 4 }))
+    expectDateParts(result.draft?.payload.firstDueDate, 2026, 10, 10)
+    expect(result.draft?.missingFields).not.toContain('firstDueDate')
+    expect(prismaMock.billGroup.create).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('interpreta primeira parcela dia 10 de outubro como 10/10 do ano coerente', async () => {
+    const result = await AssistantService.chat('company-1', {
+      message: 'Crie um boleto de R$ 4000 dividido em 4 vezes, primeira parcela dia 10 de outubro.',
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expectDateParts(result.draft?.payload.firstDueDate, 2026, 10, 10)
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('interpreta data curta 10/10 como primeiro vencimento do parcelamento', async () => {
+    const result = await AssistantService.chat('company-1', {
+      message: 'Crie um boleto de R$ 4000 dividido em 4 vezes, 10/10.',
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expectDateParts(result.draft?.payload.firstDueDate, 2026, 10, 10)
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('usa proximo ano quando dia e mes informados ja passaram', async () => {
+    vi.setSystemTime(new Date(2026, 11, 20, 12))
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'Crie um boleto de R$ 4000 dividido em 4 vezes, primeira parcela dia 10 do mes 10.',
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expectDateParts(result.draft?.payload.firstDueDate, 2027, 10, 10)
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('nao usa data atual como fallback quando nao entende o primeiro vencimento', async () => {
+    const result = await AssistantService.chat('company-1', {
+      message: 'Crie um boleto de R$ 4000 dividido em 4 vezes, primeira parcela numa data melhor.',
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload.firstDueDate).toBeUndefined()
+    expect(result.draft?.missingFields).toContain('firstDueDate')
     expect(prismaMock.bill.create).not.toHaveBeenCalled()
   })
 
@@ -311,6 +387,89 @@ describe('AssistantService.chat', () => {
     expect(prismaMock.bill.create).not.toHaveBeenCalled()
   })
 
+  it('atualiza mes do primeiro vencimento preservando o dia do rascunho aberto', async () => {
+    mockEmptyDraftMatches()
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'coloque a primeira parcela para mes 10',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+          payload: {
+            description: 'Compra parcelada',
+            totalAmount: 4000,
+            installmentCount: 4,
+            interval: 'MONTHLY',
+            firstDueDate: new Date(2026, 6, 10),
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expectDateParts(result.draft?.payload.firstDueDate, 2026, 10, 10)
+    expect(result.draft?.missingFields).toEqual([])
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('atualiza primeiro vencimento do rascunho aberto com data curta', async () => {
+    mockEmptyDraftMatches()
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'troque o vencimento para 10/10',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+          payload: {
+            description: 'Compra parcelada',
+            totalAmount: 4000,
+            installmentCount: 4,
+            interval: 'MONTHLY',
+            firstDueDate: new Date(2026, 6, 10),
+          },
+          missingFields: [],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expectDateParts(result.draft?.payload.firstDueDate, 2026, 10, 10)
+    expect(result.draft?.missingFields).toEqual([])
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
+  it('mantem primeiro vencimento faltante quando mensagem so informa mes sem dia e o rascunho nao tem data valida', async () => {
+    mockEmptyDraftMatches()
+
+    const result = await AssistantService.chat('company-1', {
+      message: 'coloque a primeira parcela para mes 10',
+      context: {
+        currentDraft: {
+          draftType: 'CREATE_BILL_INSTALLMENT_GROUP',
+          payload: {
+            description: 'Compra parcelada',
+            totalAmount: 4000,
+            installmentCount: 4,
+            interval: 'MONTHLY',
+          },
+          missingFields: ['firstDueDate'],
+          confirmationRequired: true,
+        },
+      },
+    })
+
+    expect(result.kind).toBe('DRAFT')
+    expect(result.draft?.payload).not.toHaveProperty('firstDueDate')
+    expect(result.draft?.missingFields).toContain('firstDueDate')
+    expect(executeAssistantTool).not.toHaveBeenCalled()
+    expect(prismaMock.bill.create).not.toHaveBeenCalled()
+  })
+
   it('roteia pergunta sobre despesas pendentes para despesas', async () => {
     mockToolData({
       count: 1,
@@ -446,6 +605,7 @@ describe('AssistantService.chat', () => {
 })
 
 afterAll(() => {
+  vi.useRealTimers()
   ;(env as typeof env).AI_ENABLED = originalEnv.AI_ENABLED
   ;(env as typeof env).AI_API_KEY = originalEnv.AI_API_KEY
   ;(env as typeof env).AI_MODEL = originalEnv.AI_MODEL

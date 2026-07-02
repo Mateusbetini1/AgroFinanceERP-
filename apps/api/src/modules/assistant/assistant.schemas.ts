@@ -38,7 +38,7 @@ const expenseDraftPayloadSchema = z.object({
 const billDraftPayloadSchema = z.object({
   description: z.string().min(1).max(500),
   amount: z.number().positive(),
-  dueDate: z.coerce.date(),
+  dueDate: z.coerce.date().optional(),
   status: z.literal('PENDING'),
   categoryId: optionalUuid,
   supplierId: optionalUuid,
