@@ -86,14 +86,15 @@ export default function CategoriesPage() {
     <>
       <ListPage
         title="Categorias"
-        description="Categorias usadas para organizar despesas e relatórios."
+        description="Categorias usadas para organizar receitas, despesas e relatórios."
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={categories.length === 0}
-        emptyMessage="Nenhuma categoria cadastrada."
+        emptyMessage="Nenhuma categoria cadastrada. Cadastre categorias para organizar receitas, despesas e relatórios."
         errorMessage="Não foi possível carregar as categorias."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Nova categoria"
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

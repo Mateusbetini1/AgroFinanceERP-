@@ -41,5 +41,35 @@ export function AccountsTable({
     },
   ]
 
-  return <DataTable columns={columns} data={accounts} getRowKey={(account) => account.id} />
+  return (
+    <DataTable
+      columns={columns}
+      data={accounts}
+      getRowKey={(account) => account.id}
+      mobileCard={(account) => (
+        <div className="space-y-3 rounded-lg border bg-card p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words text-sm font-semibold text-foreground">{account.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{formatAccountType(account.type)}</p>
+            </div>
+            <Badge variant={account.active ? 'success' : 'muted'}>
+              {formatStatusLabel(account.active ? 'ACTIVE' : 'INACTIVE')}
+            </Badge>
+          </div>
+
+          <div className="rounded-md border bg-muted/30 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Saldo atual</p>
+            <p className="mt-1 text-xl font-semibold tracking-normal">{formatCurrency(account.currentBalance)}</p>
+          </div>
+
+          <RowActions
+            onEdit={() => onEdit(account)}
+            onDelete={() => onDelete(account)}
+            isDeleting={deletingId === account.id}
+          />
+        </div>
+      )}
+    />
+  )
 }

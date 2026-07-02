@@ -43,5 +43,37 @@ export function EmployeesTable({
     },
   ]
 
-  return <DataTable columns={columns} data={employees} getRowKey={(employee) => employee.id} />
+  return (
+    <DataTable
+      columns={columns}
+      data={employees}
+      getRowKey={(employee) => employee.id}
+      mobileCard={(employee) => (
+        <div className="space-y-3 rounded-lg border bg-card p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words text-sm font-semibold text-foreground">{employee.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {employee.role} · {formatEmployeeType(employee.type)}
+              </p>
+            </div>
+            <Badge variant={employee.status === 'ACTIVE' ? 'success' : 'muted'}>
+              {formatStatusLabel(employee.status)}
+            </Badge>
+          </div>
+
+          <div className="rounded-md border bg-muted/30 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Salário base</p>
+            <p className="mt-1 text-lg font-semibold tracking-normal">{formatCurrency(employee.baseSalary)}</p>
+          </div>
+
+          <RowActions
+            onEdit={() => onEdit(employee)}
+            onDelete={() => onDelete(employee)}
+            isDeleting={deletingId === employee.id}
+          />
+        </div>
+      )}
+    />
+  )
 }

@@ -146,14 +146,15 @@ export default function FarmLocationsPage() {
   return (
     <>
       <ListPage
-        title="Locais"
-        description="Locais e áreas da fazenda usados em safras e futuros relatórios por área."
+        title="Talhões/Locais"
+        description="Talhões, estufas e áreas da fazenda usados em safras e relatórios."
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={false}
-        errorMessage="Não foi possível carregar os locais."
+        errorMessage="Não foi possível carregar os talhões/locais."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Novo talhão/local"
       >
         <div className="space-y-4 p-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
@@ -198,7 +199,9 @@ export default function FarmLocationsPage() {
 
           {farmLocations.length === 0 ? (
             <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-              {search || type ? 'Nenhum resultado encontrado para os filtros atuais.' : 'Nenhum local cadastrado.'}
+              {search || type
+                ? 'Nenhum resultado encontrado para os filtros atuais.'
+                : 'Nenhum talhão/local cadastrado. Cadastre áreas para vincular safras e lançamentos.'}
             </div>
           ) : (
             <FarmLocationsTable
@@ -213,8 +216,8 @@ export default function FarmLocationsPage() {
 
       <Dialog
         open={dialogOpen}
-        title={editing ? 'Editar local' : 'Novo local'}
-        description="Preencha os dados do local ou área da fazenda."
+        title={editing ? 'Editar talhão/local' : 'Novo talhão/local'}
+        description="Preencha os dados do talhão, estufa ou área da fazenda."
         onClose={() => setDialogOpen(false)}
       >
         {feedback?.type === 'error' && <InlineAlert>{feedback.message}</InlineAlert>}

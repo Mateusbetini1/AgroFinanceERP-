@@ -9,7 +9,7 @@ interface RowActionsProps {
 
 export function RowActions({ onEdit, onDelete, isDeleting }: RowActionsProps) {
   return (
-    <div className="flex justify-end gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
       <Button type="button" variant="outline" size="sm" onClick={onEdit}>
         <Pencil className="h-4 w-4" />
         Editar

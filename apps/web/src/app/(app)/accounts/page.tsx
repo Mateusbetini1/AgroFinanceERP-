@@ -93,10 +93,11 @@ export default function AccountsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={accounts.length === 0}
-        emptyMessage="Nenhuma conta cadastrada."
+        emptyMessage="Nenhuma conta cadastrada. Cadastre uma conta para controlar saldo e movimentações."
         errorMessage="Não foi possível carregar as contas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Nova conta"
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

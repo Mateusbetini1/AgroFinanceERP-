@@ -90,10 +90,11 @@ export default function ProductsPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={products.length === 0}
-        emptyMessage="Nenhum produto cadastrado."
+        emptyMessage="Nenhum produto cadastrado. Cadastre produtos para vincular receitas, safras e relatórios."
         errorMessage="Não foi possível carregar os produtos."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Novo produto"
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

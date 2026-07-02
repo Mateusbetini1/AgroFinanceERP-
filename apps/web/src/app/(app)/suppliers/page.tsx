@@ -87,10 +87,11 @@ export default function SuppliersPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={suppliers.length === 0}
-        emptyMessage="Nenhum fornecedor cadastrado."
+        emptyMessage="Nenhum fornecedor cadastrado. Cadastre fornecedores para vincular boletos e despesas."
         errorMessage="Não foi possível carregar os fornecedores."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Novo fornecedor"
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

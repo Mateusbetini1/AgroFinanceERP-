@@ -102,10 +102,11 @@ export default function EmployeesPage() {
         isLoading={query.isLoading}
         isError={query.isError}
         isEmpty={employees.length === 0}
-        emptyMessage="Nenhum funcionário cadastrado."
+        emptyMessage="Nenhum funcionário cadastrado. Cadastre funcionários para controlar pagamentos."
         errorMessage="Não foi possível carregar os funcionários."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
+        newLabel="Novo funcionário"
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

@@ -11,6 +11,7 @@ interface ListPageProps {
   isEmpty: boolean
   onRetry: () => void
   onNew?: () => void
+  newLabel?: string
   action?: React.ReactNode
   emptyMessage?: string
   errorMessage?: string
@@ -26,6 +27,7 @@ export function ListPage({
   isEmpty,
   onRetry,
   onNew,
+  newLabel = 'Novo',
   action,
   emptyMessage = 'Nenhum registro encontrado.',
   errorMessage = 'Não foi possível carregar os dados.',
@@ -41,9 +43,9 @@ export function ListPage({
         </div>
         <div className="flex flex-wrap gap-2">
           {action}
-          <Button type="button" disabled={!onNew} onClick={onNew}>
+          <Button type="button" className="w-full sm:w-auto" disabled={!onNew} onClick={onNew}>
             <Plus className="h-4 w-4" />
-            Novo
+            {newLabel}
           </Button>
         </div>
       </div>
