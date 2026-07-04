@@ -75,7 +75,7 @@ function SidebarContent({ onNavigate, showClose }: { onNavigate?: () => void; sh
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {enabledItems.map((item) => {
           const Icon = item.icon
           const active = pathname === item.href
@@ -133,7 +133,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             aria-label="Fechar menu"
             onClick={onMobileClose}
           />
-          <aside className="relative flex h-full w-72 max-w-[85vw] flex-col border-r bg-background shadow-xl">
+          <aside className="relative flex h-full min-h-0 w-72 max-w-[85vw] flex-col border-r bg-background shadow-xl">
             <SidebarContent onNavigate={onMobileClose} showClose />
           </aside>
         </div>
