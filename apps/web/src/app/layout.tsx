@@ -5,6 +5,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'AgroFinance ERP',
   description: 'Gestão financeira para produtores rurais',
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
