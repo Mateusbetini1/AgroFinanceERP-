@@ -198,7 +198,7 @@ function MobileQuickSummary({
 
         {monthly && (
           <MobileMetricCard
-            title="Resultado mes"
+            title="Resultado do mês"
             value={formatCurrency(monthly.projectedResult)}
             helper={`Realizado: ${formatCurrency(monthly.realizedResult)}`}
             icon={WalletCards}
@@ -218,8 +218,8 @@ function MobileMonthlySummary({ monthly }: { monthly?: DashboardMonthly }) {
   return (
     <Card>
       <CardHeader className="p-3 pb-2">
-        <CardTitle className="text-base tracking-normal">Visao mensal</CardTitle>
-        <p className="text-xs text-muted-foreground">Resumo do mes selecionado.</p>
+        <CardTitle className="text-base tracking-normal">Visão mensal</CardTitle>
+        <p className="text-xs text-muted-foreground">Resumo do mês selecionado.</p>
       </CardHeader>
       <CardContent className="space-y-3 p-3 pt-0">
         <div className="rounded-md border bg-background px-3">
@@ -231,9 +231,6 @@ function MobileMonthlySummary({ monthly }: { monthly?: DashboardMonthly }) {
             value={formatCurrency(monthly.pendingExpenses + monthly.pendingBills)}
             tone="warning"
           />
-          <MonthlyRow label="Folha prevista" value={formatCurrency(monthly.payroll.payrollExpected)} />
-          <MonthlyRow label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
-          <MonthlyRow label="Falta pagar folha" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
           <MonthlyRow
             label="Resultado previsto"
             value={formatCurrency(monthly.projectedResult)}
@@ -256,10 +253,10 @@ function MobileMonthlySummary({ monthly }: { monthly?: DashboardMonthly }) {
             <span className="text-xs text-muted-foreground">{payrollEmployees.length} func.</span>
           </summary>
           <div className="space-y-2 border-t p-3">
-            <p className="text-xs text-muted-foreground">Mensalistas entram na previsao. Diaristas aparecem pelo total pago.</p>
+            <p className="text-xs text-muted-foreground">Mensalistas entram na previsão. Diaristas aparecem pelo total pago.</p>
 
             {payrollEmployees.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum funcionario ou pagamento neste mes.</p>
+              <p className="text-sm text-muted-foreground">Nenhum funcionário ou pagamento neste mês.</p>
             ) : (
               payrollEmployees.map((employee) => (
                 <div key={employee.employeeId} className="rounded-md border bg-muted/20 p-2.5">
@@ -315,8 +312,8 @@ export function MobileDashboardHome({
       <Card>
         <CardContent className="space-y-3 p-3">
           <div>
-            <h2 className="text-base font-semibold tracking-normal">Acoes rapidas</h2>
-            <p className="text-xs text-muted-foreground">Lancamentos e consultas frequentes.</p>
+            <h2 className="text-base font-semibold tracking-normal">Ações rápidas</h2>
+            <p className="text-xs text-muted-foreground">Lançamentos e consultas frequentes.</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <QuickLink href="/revenues" label="Nova receita" icon={ArrowUpCircle} variant="default" />

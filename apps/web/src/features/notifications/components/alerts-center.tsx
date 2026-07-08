@@ -78,13 +78,38 @@ function dueText(item: NotificationAlertItem, groupKey: NotificationGroupKey) {
   if (item.type === 'REVENUE') return `prevista para ${formatDate(item.date)}`
   if (groupKey === 'OVERDUE') return `vencida desde ${formatDate(item.date)}`
   if (groupKey === 'DUE_TODAY') return 'vence hoje'
-  if (groupKey === 'DUE_TOMORROW') return 'vence amanha'
+  if (groupKey === 'DUE_TOMORROW') return 'vence amanhã'
   return `vence em ${formatDate(item.date)}`
 }
 
+function normalizedText(value: string) {
+  return value.trim().toLocaleLowerCase('pt-BR')
+}
+
+function meaningfulDetail(item: NotificationAlertItem) {
+  const title = normalizedText(item.title)
+  const description = normalizedText(item.description)
+
+  if (!item.description || description === title) return ''
+  if (['boleto', 'despesa', 'receita', 'pendente'].includes(description)) return ''
+  return item.description
+}
+
 function itemTitle(item: NotificationAlertItem, groupKey: NotificationGroupKey) {
-  const description = item.description && item.description !== item.title ? ` - ${item.description}` : ''
-  return `${itemTypeLabel(item.type)} - ${item.title}${description} - ${dueText(item, groupKey)}`
+  const type = itemTypeLabel(item.type)
+  const detail = meaningfulDetail(item)
+  const title = normalizedText(item.title)
+  const label = detail
+    ? `${type} de ${detail}`
+    : title === normalizedText(type)
+      ? type
+      : `${type} ${item.title}`
+
+  return `${label} ${dueText(item, groupKey)}`
+}
+
+function compactItemTitle(item: NotificationAlertItem, groupKey: NotificationGroupKey) {
+  return itemTitle(item, groupKey)
 }
 
 function actionLinks(group: NotificationAlertGroup) {
@@ -153,16 +178,19 @@ function AlertItemRow({
       )}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={overdue ? 'destructive' : 'outline'} className={compact ? 'px-2 py-0 text-[11px]' : undefined}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            variant={overdue ? 'destructive' : 'outline'}
+            className={cn('shrink-0', compact && 'px-2 py-0 text-[11px]')}
+          >
             {itemTypeLabel(item.type)}
           </Badge>
-          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', compact && 'text-[11px]', severityClass(item.severity))}>
+          <span className={cn('inline-flex shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium', compact && 'text-[11px]', severityClass(item.severity))}>
             {overdue ? 'Vencido' : dueText(item, groupKey)}
           </span>
         </div>
         <p className={cn('mt-1.5 line-clamp-1 font-medium', overdue ? 'text-rose-800' : 'text-foreground')}>
-          {compact ? item.title : itemTitle(item, groupKey)}
+          {compact ? compactItemTitle(item, groupKey) : itemTitle(item, groupKey)}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {compact ? item.description : formatDate(item.date)}
