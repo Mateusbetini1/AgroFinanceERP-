@@ -1,0 +1,20 @@
+name: Daily Notifications
+
+on:
+  schedule:
+    # GitHub Actions usa UTC. 11:00 UTC = 08:00 em Brasilia.
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  daily-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger daily reminders
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --data '{}' \
+            https://agrofinance-api.onrender.com/api/v1/notifications/jobs/daily-reminders

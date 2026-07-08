@@ -41,7 +41,7 @@ export function createApp() {
       origin: env.CORS_ORIGIN,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id', 'x-cron-secret'],
     }),
   )
 

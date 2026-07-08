@@ -40,6 +40,9 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
+
+  // External scheduled jobs
+  CRON_SECRET: z.string().optional(),
 })
 
 const result = envSchema.safeParse(process.env)

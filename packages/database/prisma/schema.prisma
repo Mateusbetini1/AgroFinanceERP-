@@ -187,6 +187,31 @@ enum ReminderRecurrenceType {
   @@map("reminder_recurrence_type")
 }
 
+enum NotificationDeliverySourceType {
+  REMINDER_RULE
+  BILL_ALERT
+  EXPENSE_ALERT
+  REVENUE_ALERT
+  DAILY_SUMMARY
+
+  @@map("notification_delivery_source_type")
+}
+
+enum NotificationDeliveryChannel {
+  PUSH
+
+  @@map("notification_delivery_channel")
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+
+  @@map("notification_delivery_status")
+}
+
 // ================================================================
 // COMPANY + AUTH
 // ================================================================
@@ -225,6 +250,7 @@ model Company {
   safras           Safra[]
   pushSubscriptions PushSubscription[]
   reminderRules   ReminderRule[]
+  notificationDeliveries NotificationDelivery[]
 
   @@index([active])
   @@map("companies")
@@ -246,6 +272,7 @@ model User {
   auditLogs     AuditLog[]
   pushSubscriptions PushSubscription[]
   reminderRules ReminderRule[]
+  notificationDeliveries NotificationDelivery[]
 
   @@map("users")
 }
@@ -332,11 +359,42 @@ model ReminderRule {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationDeliveries NotificationDelivery[]
 
   @@index([companyId, userId])
   @@index([companyId, userId, active])
   @@index([companyId, recurrenceType])
   @@map("reminder_rules")
+}
+
+model NotificationDelivery {
+  id             String                         @id @default(uuid())
+  companyId      String                         @map("company_id")
+  userId         String                         @map("user_id")
+  reminderRuleId String?                        @map("reminder_rule_id")
+  sourceType     NotificationDeliverySourceType @map("source_type")
+  sourceId       String?                        @map("source_id")
+  channel        NotificationDeliveryChannel
+  targetDate     DateTime                       @map("target_date")
+  leadDays       Int?                           @map("lead_days")
+  title          String
+  body           String
+  url            String
+  status         NotificationDeliveryStatus     @default(PENDING)
+  dedupeKey      String                         @unique @map("dedupe_key")
+  error          String?
+  sentAt         DateTime?                      @map("sent_at")
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminderRule ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, userId, targetDate])
+  @@index([companyId, status])
+  @@index([reminderRuleId])
+  @@map("notification_deliveries")
 }
 
 // ================================================================

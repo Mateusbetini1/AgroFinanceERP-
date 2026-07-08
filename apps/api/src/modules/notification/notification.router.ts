@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { NotificationService } from './notification.service'
 import { ReminderRuleService } from './reminder-rule.service'
+import { DailyReminderJobService } from './daily-reminder-job.service'
 import { authenticate } from '../../shared/middleware/authenticate'
 import { requireCompany } from '../../shared/middleware/require-company'
 import { anyMember } from '../../shared/middleware/authorize'
@@ -14,6 +15,15 @@ import {
 } from './reminder-rule.schemas'
 
 export const notificationRouter = Router()
+
+notificationRouter.post(
+  '/jobs/daily-reminders',
+  asyncHandler(async (req, res) => {
+    DailyReminderJobService.assertCronSecret(req.get('x-cron-secret'))
+    const data = await DailyReminderJobService.run({ dryRun: req.body?.dryRun === true })
+    res.json({ success: true, data })
+  }),
+)
 
 notificationRouter.use(authenticate)
 notificationRouter.use(requireCompany)
