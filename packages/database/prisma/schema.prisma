@@ -207,6 +207,7 @@ model Company {
   invoices         Invoice[]
   farmLocations    FarmLocation[]
   safras           Safra[]
+  pushSubscriptions PushSubscription[]
 
   @@index([active])
   @@map("companies")
@@ -226,6 +227,7 @@ model User {
   refreshTokens RefreshToken[]
   memberships   Membership[]
   auditLogs     AuditLog[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -269,6 +271,28 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  active    Boolean  @default(true)
+  lastSeenAt DateTime? @map("last_seen_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([companyId, userId, active])
+  @@map("push_subscriptions")
 }
 
 // ================================================================

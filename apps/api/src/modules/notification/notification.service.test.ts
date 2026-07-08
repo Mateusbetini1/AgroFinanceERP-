@@ -1,14 +1,36 @@
 import jwt from 'jsonwebtoken'
 import request from 'supertest'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('web-push', () => ({
+  default: {
+    setVapidDetails: vi.fn(),
+    sendNotification: vi.fn(),
+  },
+}))
+
 import { createApp } from '../../app'
 import { env } from '../../config/env'
 import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 import { NotificationService } from './notification.service'
+import webpush from 'web-push'
 
 const companyId = 'company-1'
 const otherCompanyId = 'company-2'
 const referenceDate = new Date('2026-07-08T12:00:00.000Z')
+const pushPayload = {
+  endpoint: 'https://push.example/subscription-1',
+  keys: {
+    p256dh: 'p256dh-key',
+    auth: 'auth-key',
+  },
+}
+
+function configureVapid() {
+  env.VAPID_PUBLIC_KEY = 'public-key'
+  env.VAPID_PRIVATE_KEY = 'private-key'
+  env.VAPID_SUBJECT = 'mailto:mateusbertini15@gmail.com'
+}
 
 function bill(overrides: Record<string, unknown> = {}) {
   return {
@@ -206,5 +228,148 @@ describe('NotificationService.getAlerts', () => {
     expect(prismaMock.revenue.updateMany).not.toHaveBeenCalled()
     expect(prismaMock.account.update).not.toHaveBeenCalled()
     expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('NotificationService push', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+    vi.mocked(webpush.setVapidDetails).mockReset()
+    vi.mocked(webpush.sendNotification).mockReset()
+    env.VAPID_PUBLIC_KEY = undefined
+    env.VAPID_PRIVATE_KEY = undefined
+    env.VAPID_SUBJECT = undefined
+  })
+
+  it('public-key retorna chave publica quando configurada', () => {
+    configureVapid()
+
+    expect(NotificationService.getPublicKey()).toEqual({ publicKey: 'public-key' })
+  })
+
+  it('retorna erro amigavel se VAPID nao configurado', async () => {
+    expect(() => NotificationService.getPublicKey()).toThrow('Notificações push não estão configuradas no servidor.')
+    await expect(NotificationService.subscribe(companyId, 'user-1', pushPayload)).rejects.toMatchObject({
+      code: 'PUSH_NOT_CONFIGURED',
+    })
+  })
+
+  it('subscribe salva com userId e companyId do backend e ignora companyId do cliente', async () => {
+    configureVapid()
+    prismaMock.pushSubscription.upsert.mockResolvedValue({ id: 'push-1', active: true })
+
+    await NotificationService.subscribe(
+      companyId,
+      'user-1',
+      { ...pushPayload, companyId: otherCompanyId } as typeof pushPayload & { companyId: string },
+      'Android Chrome',
+    )
+
+    expect(prismaMock.pushSubscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { endpoint: pushPayload.endpoint },
+        create: expect.objectContaining({
+          companyId,
+          userId: 'user-1',
+          endpoint: pushPayload.endpoint,
+          p256dh: pushPayload.keys.p256dh,
+          auth: pushPayload.keys.auth,
+          userAgent: 'Android Chrome',
+          active: true,
+        }),
+        update: expect.objectContaining({
+          companyId,
+          userId: 'user-1',
+          p256dh: pushPayload.keys.p256dh,
+          auth: pushPayload.keys.auth,
+          active: true,
+        }),
+      }),
+    )
+  })
+
+  it('unsubscribe desativa subscription do usuario e empresa', async () => {
+    prismaMock.pushSubscription.updateMany.mockResolvedValue({ count: 1 })
+
+    const result = await NotificationService.unsubscribe(companyId, 'user-1', pushPayload.endpoint)
+
+    expect(result).toEqual({ deactivated: 1 })
+    expect(prismaMock.pushSubscription.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, userId: 'user-1', endpoint: pushPayload.endpoint },
+        data: expect.objectContaining({ active: false }),
+      }),
+    )
+  })
+
+  it('test envia apenas para subscriptions ativas do usuario/company', async () => {
+    configureVapid()
+    prismaMock.pushSubscription.findMany.mockResolvedValue([
+      { id: 'push-1', endpoint: pushPayload.endpoint, p256dh: pushPayload.keys.p256dh, auth: pushPayload.keys.auth },
+    ])
+    vi.mocked(webpush.sendNotification).mockResolvedValue({} as never)
+
+    const result = await NotificationService.sendTest(companyId, 'user-1')
+
+    expect(prismaMock.pushSubscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, userId: 'user-1', active: true },
+      }),
+    )
+    expect(webpush.sendNotification).toHaveBeenCalledWith(
+      { endpoint: pushPayload.endpoint, keys: pushPayload.keys },
+      expect.stringContaining('notificações ativadas neste aparelho'),
+    )
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 })
+  })
+
+  it('test marca endpoint invalido como inativo quando push retorna 410', async () => {
+    configureVapid()
+    prismaMock.pushSubscription.findMany.mockResolvedValue([
+      { id: 'push-1', endpoint: pushPayload.endpoint, p256dh: pushPayload.keys.p256dh, auth: pushPayload.keys.auth },
+    ])
+    vi.mocked(webpush.sendNotification).mockRejectedValue({ statusCode: 410 })
+
+    const result = await NotificationService.sendTest(companyId, 'user-1')
+
+    expect(prismaMock.pushSubscription.update).toHaveBeenCalledWith({
+      where: { id: 'push-1' },
+      data: { active: false },
+    })
+    expect(result).toEqual({ sent: 0, failed: 1, total: 1 })
+  })
+})
+
+describe('notification push route guards and validation', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+    configureVapid()
+  })
+
+  it('subscribe exige auth/company', async () => {
+    await request(createApp()).post('/api/v1/notifications/push/subscribe').send(pushPayload).expect(401)
+
+    const token = jwt.sign({ sub: 'user-1', email: 'user@example.com' }, env.JWT_SECRET)
+    await request(createApp())
+      .post('/api/v1/notifications/push/subscribe')
+      .set('Authorization', `Bearer ${token}`)
+      .send(pushPayload)
+      .expect(400)
+  })
+
+  it('subscribe rejeita payload invalido', async () => {
+    const token = jwt.sign({ sub: 'user-1', email: 'user@example.com' }, env.JWT_SECRET)
+    prismaMock.membership.findUnique.mockResolvedValue({
+      active: true,
+      role: 'OWNER',
+      company: { id: companyId, name: 'Empresa', active: true, deletedAt: null },
+    })
+
+    await request(createApp())
+      .post('/api/v1/notifications/push/subscribe')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-company-id', '11111111-1111-4111-8111-111111111111')
+      .send({ endpoint: 'invalid', keys: {} })
+      .expect(422)
   })
 })

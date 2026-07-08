@@ -1,10 +1,14 @@
 import { prisma } from '../../config/prisma'
+import { env } from '../../config/env'
+import { AppError } from '../../shared/errors/AppError'
+import webpush from 'web-push'
 import type {
   NotificationAlertGroup,
   NotificationAlertItem,
   NotificationAlertsResponse,
   NotificationGroupKey,
   NotificationSeverity,
+  PushSubscriptionDto,
 } from './notification.schemas'
 
 type GetAlertsOptions = {
@@ -84,7 +88,117 @@ function sortItems(a: NotificationAlertItem, b: NotificationAlertItem) {
   return new Date(a.date).getTime() - new Date(b.date).getTime() || b.amount - a.amount
 }
 
+function assertPushConfigured() {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) {
+    throw AppError.badRequest(
+      'Notificações push não estão configuradas no servidor.',
+      'PUSH_NOT_CONFIGURED',
+    )
+  }
+
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY)
+}
+
+function toWebPushSubscription(subscription: { endpoint: string; p256dh: string; auth: string }) {
+  return {
+    endpoint: subscription.endpoint,
+    keys: {
+      p256dh: subscription.p256dh,
+      auth: subscription.auth,
+    },
+  }
+}
+
 export const NotificationService = {
+  getPublicKey() {
+    if (!env.VAPID_PUBLIC_KEY) {
+      throw AppError.badRequest(
+        'Notificações push não estão configuradas no servidor.',
+        'PUSH_NOT_CONFIGURED',
+      )
+    }
+
+    return { publicKey: env.VAPID_PUBLIC_KEY }
+  },
+
+  async subscribe(companyId: string, userId: string, input: PushSubscriptionDto, userAgent?: string | null) {
+    assertPushConfigured()
+
+    return prisma.pushSubscription.upsert({
+      where: { endpoint: input.endpoint },
+      create: {
+        companyId,
+        userId,
+        endpoint: input.endpoint,
+        p256dh: input.keys.p256dh,
+        auth: input.keys.auth,
+        userAgent,
+        active: true,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        companyId,
+        userId,
+        p256dh: input.keys.p256dh,
+        auth: input.keys.auth,
+        userAgent,
+        active: true,
+        lastSeenAt: new Date(),
+      },
+    })
+  },
+
+  async unsubscribe(companyId: string, userId: string, endpoint: string) {
+    const result = await prisma.pushSubscription.updateMany({
+      where: { companyId, userId, endpoint },
+      data: { active: false, lastSeenAt: new Date() },
+    })
+
+    return { deactivated: result.count }
+  },
+
+  async sendTest(companyId: string, userId: string) {
+    assertPushConfigured()
+
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: { companyId, userId, active: true },
+      select: { id: true, endpoint: true, p256dh: true, auth: true },
+    })
+
+    const payload = JSON.stringify({
+      title: 'AgroFinance',
+      body: 'AgroFinance: notificações ativadas neste aparelho.',
+      url: '/dashboard',
+    })
+
+    let sent = 0
+    let failed = 0
+
+    await Promise.all(
+      subscriptions.map(async (subscription) => {
+        try {
+          await webpush.sendNotification(toWebPushSubscription(subscription), payload)
+          sent += 1
+        } catch (error) {
+          failed += 1
+          const statusCode =
+            error && typeof error === 'object' && 'statusCode' in error
+              ? Number((error as { statusCode?: number }).statusCode)
+              : null
+
+          if (statusCode === 404 || statusCode === 410) {
+            await prisma.pushSubscription.update({
+              where: { id: subscription.id },
+              data: { active: false },
+            })
+          }
+        }
+      }),
+    )
+
+    return { sent, failed, total: subscriptions.length }
+  },
+
   async getAlerts(companyId: string, options: GetAlertsOptions = {}): Promise<NotificationAlertsResponse> {
     const referenceDate = options.referenceDate ?? new Date()
     const { next7End } = getLocalDayPeriod(referenceDate)

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { AlertsCenter } from '@/features/notifications/components/alerts-center'
+import { PushNotificationCard } from '@/features/notifications/components/push-notification-card'
 import { cn, formatCurrency, formatEmployeeType } from '@/lib/utils'
 import type { DashboardLive, DashboardMonthly } from '../types'
 
@@ -324,6 +325,7 @@ export function MobileDashboardHome({
   return (
     <section className="space-y-3 lg:hidden">
       <AlertsCenter variant="mobile" />
+      <PushNotificationCard />
 
       <MobileQuickSummary
         live={live}

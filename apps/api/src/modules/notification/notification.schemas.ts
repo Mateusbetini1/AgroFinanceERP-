@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 export const notificationGroupKeys = [
   'OVERDUE',
   'DUE_TODAY',
@@ -44,3 +46,19 @@ export type NotificationAlertsResponse = {
   summary: NotificationAlertSummary
   groups: NotificationAlertGroup[]
 }
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+})
+
+export const unsubscribePushSchema = z.object({
+  endpoint: z.string().url(),
+})
+
+export type PushSubscriptionDto = z.infer<typeof pushSubscriptionSchema>
+export type UnsubscribePushDto = z.infer<typeof unsubscribePushSchema>

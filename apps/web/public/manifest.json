@@ -1,0 +1,17 @@
+{
+  "name": "AgroFinance",
+  "short_name": "AgroFinance",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#166534",
+  "description": "Gestão financeira para produtores rurais",
+  "icons": [
+    {
+      "src": "/agrofinance-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

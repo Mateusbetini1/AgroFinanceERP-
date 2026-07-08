@@ -26,6 +26,7 @@ export const prismaMock = {
   company: createModelMock(),
   membership: createModelMock(),
   refreshToken: createModelMock(),
+  pushSubscription: createModelMock(),
   auditLog: createModelMock(),
   account: createModelMock(),
   transaction: createModelMock(),
