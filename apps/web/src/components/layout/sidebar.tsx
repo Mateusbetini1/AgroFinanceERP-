@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   ArrowLeftRight,
   BarChart3,
+  BellRing,
   Bot,
   CalendarClock,
   CreditCard,
@@ -31,6 +32,7 @@ const menuGroups = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: Home },
       { href: '/assistant', label: 'Assistente', icon: Bot },
+      { href: '/alerts', label: 'Alertas e lembretes', icon: BellRing },
     ],
   },
   {

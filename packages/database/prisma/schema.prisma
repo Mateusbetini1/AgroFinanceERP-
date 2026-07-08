@@ -171,6 +171,22 @@ enum AuditAction {
   @@map("audit_action")
 }
 
+enum ReminderRuleType {
+  BILL
+  EXPENSE
+  REVENUE
+  GENERAL
+
+  @@map("reminder_rule_type")
+}
+
+enum ReminderRecurrenceType {
+  MONTHLY_DAY
+  ONE_TIME
+
+  @@map("reminder_recurrence_type")
+}
+
 // ================================================================
 // COMPANY + AUTH
 // ================================================================
@@ -208,6 +224,7 @@ model Company {
   farmLocations    FarmLocation[]
   safras           Safra[]
   pushSubscriptions PushSubscription[]
+  reminderRules   ReminderRule[]
 
   @@index([active])
   @@map("companies")
@@ -228,6 +245,7 @@ model User {
   memberships   Membership[]
   auditLogs     AuditLog[]
   pushSubscriptions PushSubscription[]
+  reminderRules ReminderRule[]
 
   @@map("users")
 }
@@ -293,6 +311,32 @@ model PushSubscription {
   @@index([userId])
   @@index([companyId, userId, active])
   @@map("push_subscriptions")
+}
+
+model ReminderRule {
+  id             String                 @id @default(uuid())
+  companyId      String                 @map("company_id")
+  userId         String                 @map("user_id")
+  name           String
+  type           ReminderRuleType
+  active         Boolean                @default(true)
+  recurrenceType ReminderRecurrenceType @map("recurrence_type")
+  dayOfMonth     Int?                   @map("day_of_month")
+  dueDate        DateTime?              @map("due_date")
+  leadDays       Int[]                  @map("lead_days")
+  pushEnabled    Boolean                @default(true) @map("push_enabled")
+  inAppEnabled   Boolean                @default(true) @map("in_app_enabled")
+  notes          String?
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId])
+  @@index([companyId, userId, active])
+  @@index([companyId, recurrenceType])
+  @@map("reminder_rules")
 }
 
 // ================================================================

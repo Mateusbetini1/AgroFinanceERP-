@@ -1,11 +1,17 @@
 import { Router } from 'express'
 import { NotificationService } from './notification.service'
+import { ReminderRuleService } from './reminder-rule.service'
 import { authenticate } from '../../shared/middleware/authenticate'
 import { requireCompany } from '../../shared/middleware/require-company'
 import { anyMember } from '../../shared/middleware/authorize'
 import { validate } from '../../shared/middleware/validate'
 import { asyncHandler } from '../../shared/utils/async-handler'
 import { pushSubscriptionSchema, unsubscribePushSchema } from './notification.schemas'
+import {
+  createReminderRuleSchema,
+  reminderRuleParamsSchema,
+  updateReminderRuleSchema,
+} from './reminder-rule.schemas'
 
 export const notificationRouter = Router()
 
@@ -17,6 +23,55 @@ notificationRouter.get(
   anyMember,
   asyncHandler(async (req, res) => {
     const data = await NotificationService.getAlerts(req.company!.id)
+    res.json({ success: true, data })
+  }),
+)
+
+notificationRouter.get(
+  '/reminder-rules',
+  anyMember,
+  asyncHandler(async (req, res) => {
+    const data = await ReminderRuleService.list(req.company!.id, req.user!.id)
+    res.json({ success: true, data })
+  }),
+)
+
+notificationRouter.get(
+  '/reminder-rules/preview',
+  anyMember,
+  asyncHandler(async (req, res) => {
+    const data = await ReminderRuleService.preview(req.company!.id, req.user!.id)
+    res.json({ success: true, data })
+  }),
+)
+
+notificationRouter.post(
+  '/reminder-rules',
+  anyMember,
+  validate(createReminderRuleSchema),
+  asyncHandler(async (req, res) => {
+    const data = await ReminderRuleService.create(req.company!.id, req.user!.id, req.body)
+    res.status(201).json({ success: true, data })
+  }),
+)
+
+notificationRouter.patch(
+  '/reminder-rules/:id',
+  anyMember,
+  validate(reminderRuleParamsSchema, 'params'),
+  validate(updateReminderRuleSchema),
+  asyncHandler(async (req, res) => {
+    const data = await ReminderRuleService.update(req.company!.id, req.user!.id, req.params.id, req.body)
+    res.json({ success: true, data })
+  }),
+)
+
+notificationRouter.delete(
+  '/reminder-rules/:id',
+  anyMember,
+  validate(reminderRuleParamsSchema, 'params'),
+  asyncHandler(async (req, res) => {
+    const data = await ReminderRuleService.delete(req.company!.id, req.user!.id, req.params.id)
     res.json({ success: true, data })
   }),
 )
