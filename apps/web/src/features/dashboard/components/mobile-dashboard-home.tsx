@@ -8,7 +8,6 @@ import {
   ArrowUpCircle,
   Banknote,
   CalendarClock,
-  CheckCircle2,
   Landmark,
   PlusCircle,
   Receipt,
@@ -18,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import { AlertsCenter } from '@/features/notifications/components/alerts-center'
 import { cn, formatCurrency } from '@/lib/utils'
 import type { DashboardLive, DashboardMonthly } from '../types'
 
@@ -88,62 +88,6 @@ function QuickLink({
   )
 }
 
-function buildAttentionItems(live?: DashboardLive) {
-  if (!live) return []
-
-  const items: Array<{ key: string; text: string; tone: MobileTone }> = []
-
-  if (live.commitments.overduePayables > 0) {
-    items.push({
-      key: 'overdue-payables',
-      text: `Contas vencidas: ${formatCurrency(live.commitments.overduePayables)}.`,
-      tone: 'negative',
-    })
-  }
-
-  if (live.commitments.overdueReceivables > 0) {
-    items.push({
-      key: 'overdue-receivables',
-      text: `Receitas vencidas: ${formatCurrency(live.commitments.overdueReceivables)}.`,
-      tone: 'warning',
-    })
-  }
-
-  if (live.projection.projectedBalance30Days < 0) {
-    items.push({
-      key: 'negative-projection',
-      text: `Saldo projetado negativo em 30 dias: ${formatCurrency(live.projection.projectedBalance30Days)}.`,
-      tone: 'negative',
-    })
-  }
-
-  if (live.commitments.payablesNext7Days > 0) {
-    items.push({
-      key: 'payables-next-7',
-      text: `A pagar nos próximos 7 dias: ${formatCurrency(live.commitments.payablesNext7Days)}.`,
-      tone: 'warning',
-    })
-  }
-
-  if (live.commitments.receivablesNext7Days > 0) {
-    items.push({
-      key: 'receivables-next-7',
-      text: `A receber nos próximos 7 dias: ${formatCurrency(live.commitments.receivablesNext7Days)}.`,
-      tone: 'positive',
-    })
-  }
-
-  live.alerts.slice(0, 2).forEach((alert, index) => {
-    items.push({
-      key: `alert-${index}`,
-      text: alert.message,
-      tone: alert.severity === 'critical' ? 'negative' : alert.severity === 'warning' ? 'warning' : 'default',
-    })
-  })
-
-  return items.slice(0, 4)
-}
-
 export function MobileDashboardHome({
   live,
   monthly,
@@ -157,15 +101,13 @@ export function MobileDashboardHome({
   isLiveError: boolean
   onRetryLive: () => void
 }) {
-  const attentionItems = buildAttentionItems(live)
-
   return (
     <section className="space-y-4 lg:hidden">
       <div className="rounded-lg border bg-card p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">Hoje</p>
-            <h2 className="text-xl font-semibold tracking-normal text-foreground">Resumo rápido</h2>
+            <h2 className="text-xl font-semibold tracking-normal text-foreground">Resumo rapido</h2>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={onRetryLive}>
             <RefreshCcw className="h-4 w-4" />
@@ -176,13 +118,13 @@ export function MobileDashboardHome({
         {isLiveLoading && (
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner className="h-4 w-4" />
-            Carregando posição financeira...
+            Carregando posicao financeira...
           </div>
         )}
 
         {isLiveError && (
           <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-            Não foi possível carregar a posição financeira.
+            Nao foi possivel carregar a posicao financeira.
           </div>
         )}
 
@@ -228,7 +170,7 @@ export function MobileDashboardHome({
         {monthly && (
           <div className="mt-3">
             <MobileMetricCard
-              title="Resultado do mês"
+              title="Resultado do mes"
               value={formatCurrency(monthly.projectedResult)}
               helper={`Realizado: ${formatCurrency(monthly.realizedResult)}`}
               icon={WalletCards}
@@ -238,34 +180,12 @@ export function MobileDashboardHome({
         )}
       </div>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <h2 className="text-base font-semibold tracking-normal">Atenção agora</h2>
-          </div>
-
-          {attentionItems.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              Nenhum alerta importante agora.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {attentionItems.map((item) => (
-                <div key={item.key} className={cn('rounded-md border p-3 text-sm', toneClass(item.tone))}>
-                  {item.text}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AlertsCenter variant="mobile" />
 
       <Card>
         <CardContent className="space-y-3 p-4">
           <div>
-            <h2 className="text-base font-semibold tracking-normal">Ações rápidas</h2>
+            <h2 className="text-base font-semibold tracking-normal">Acoes rapidas</h2>
             <p className="text-sm text-muted-foreground">Atalhos para as rotinas mais usadas.</p>
           </div>
           <div className="grid gap-2">

@@ -25,6 +25,7 @@ import { dashboardRouter } from './modules/dashboard/dashboard.router'
 import { reportRouter } from './modules/report/report.router'
 import { invoiceRouter } from './modules/invoice/invoice.router'
 import { assistantRouter } from './modules/assistant/assistant.router'
+import { notificationRouter } from './modules/notification/notification.router'
 // import { farmLocationRouter } from './modules/farm-location/farm-location.router'
 // import { dashboardRouter } from './modules/dashboard/dashboard.router'
 // import { reportRouter } from './modules/report/report.router'
@@ -105,6 +106,7 @@ export function createApp() {
   app.use('/api/v1/reports', reportRouter)
   app.use('/api/v1/invoices', invoiceRouter)
   app.use('/api/v1/assistant', assistantRouter)
+  app.use('/api/v1/notifications', notificationRouter)
   // app.use('/api/v1/farm-locations', farmLocationRouter)
   // app.use('/api/v1/dashboard', dashboardRouter)
   // app.use('/api/v1/reports', reportRouter)

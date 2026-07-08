@@ -20,6 +20,7 @@ import { Select } from '@/components/ui/select'
 import { getDashboardLive, getDashboardMonthly } from '@/features/dashboard/api'
 import { FinancialPositionSection } from '@/features/dashboard/components/financial-position-section'
 import { MobileDashboardHome } from '@/features/dashboard/components/mobile-dashboard-home'
+import { AlertsCenter } from '@/features/notifications/components/alerts-center'
 import { formatCurrency, formatEmployeeType } from '@/lib/utils'
 
 type KpiTone = 'default' | 'positive' | 'negative' | 'warning'
@@ -154,6 +155,7 @@ export default function DashboardPage() {
       />
 
       <div className="hidden lg:block">
+        <AlertsCenter className="mb-6" />
         <FinancialPositionSection
           data={liveQuery.data}
           isLoading={liveQuery.isLoading}
