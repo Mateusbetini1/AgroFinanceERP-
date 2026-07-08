@@ -18,6 +18,8 @@ function createModelMock() {
   }
 }
 
+const reminderRuleMock = createModelMock()
+
 export const prismaMock = {
   $connect: vi.fn(),
   $disconnect: vi.fn(),
@@ -27,6 +29,7 @@ export const prismaMock = {
   membership: createModelMock(),
   refreshToken: createModelMock(),
   pushSubscription: createModelMock(),
+  reminderRule: reminderRuleMock,
   auditLog: createModelMock(),
   account: createModelMock(),
   transaction: createModelMock(),
