@@ -15,6 +15,7 @@ import {
   MapPin,
   Package,
   Receipt,
+  Repeat,
   Sprout,
   Tags,
   Truck,
@@ -24,24 +25,48 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const enabledItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/assistant', label: 'Assistente', icon: Bot },
-  { href: '/cashflow/forecast', label: 'Fluxo Projetado', icon: CalendarClock },
-  { href: '/accounts', label: 'Contas', icon: CreditCard },
-  { href: '/categories', label: 'Categorias', icon: Tags },
-  { href: '/products', label: 'Produtos', icon: Package },
-  { href: '/suppliers', label: 'Fornecedores', icon: Truck },
-  { href: '/revenues', label: 'Receitas', icon: BarChart3 },
-  { href: '/expenses', label: 'Despesas', icon: Receipt },
-  { href: '/bills', label: 'Boletos', icon: FileText },
-  { href: '/bills/installments', label: 'Parcelamentos', icon: ListChecks },
-  { href: '/safras', label: 'Safras', icon: Sprout },
-  { href: '/farm-locations', label: 'Locais', icon: MapPin },
-  { href: '/reports/safras', label: 'Relatórios', icon: FileText },
-  { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
-  { href: '/employee-payments', label: 'Pagamentos', icon: HandCoins },
-  { href: '/employees', label: 'Funcionários', icon: Users },
+const menuGroups = [
+  {
+    title: 'Início',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: Home },
+      { href: '/assistant', label: 'Assistente', icon: Bot },
+    ],
+  },
+  {
+    title: 'Financeiro',
+    items: [
+      { href: '/revenues', label: 'Receitas', icon: BarChart3 },
+      { href: '/expenses', label: 'Despesas', icon: Receipt },
+      { href: '/bills', label: 'Boletos', icon: FileText },
+      { href: '/bills/installments', label: 'Parcelamentos', icon: ListChecks },
+      { href: '/bills/recurring', label: 'Boletos Recorrentes', icon: Repeat },
+      { href: '/transfers', label: 'Transferências', icon: ArrowLeftRight },
+      { href: '/cashflow/forecast', label: 'Fluxo de Caixa Projetado', icon: CalendarClock },
+      { href: '/employee-payments', label: 'Pagamentos de Funcionários', icon: HandCoins },
+    ],
+  },
+  {
+    title: 'Cadastros',
+    items: [
+      { href: '/accounts', label: 'Contas', icon: CreditCard },
+      { href: '/categories', label: 'Categorias', icon: Tags },
+      { href: '/products', label: 'Produtos', icon: Package },
+      { href: '/suppliers', label: 'Fornecedores', icon: Truck },
+      { href: '/employees', label: 'Funcionários', icon: Users },
+    ],
+  },
+  {
+    title: 'Produção',
+    items: [
+      { href: '/safras', label: 'Safras', icon: Sprout },
+      { href: '/farm-locations', label: 'Talhões/Locais', icon: MapPin },
+    ],
+  },
+  {
+    title: 'Relatórios',
+    items: [{ href: '/reports/safras', label: 'Relatório por Safra', icon: FileText }],
+  },
 ]
 
 const upcomingItems: Array<{ label: string; icon: typeof FileText }> = []
@@ -75,28 +100,36 @@ function SidebarContent({ onNavigate, showClose }: { onNavigate?: () => void; sh
         )}
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {enabledItems.map((item) => {
-          const Icon = item.icon
-          const active = pathname === item.href
+      <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4">
+        {menuGroups.map((group) => (
+          <div key={group.title} className="space-y-1">
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {group.title}
+            </p>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-                active
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          )
-        })}
+            {group.items.map((item) => {
+              const Icon = item.icon
+              const active = pathname === item.href
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium leading-snug transition-colors',
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
 
         <div className="pt-3">
           {upcomingItems.map((item) => {
