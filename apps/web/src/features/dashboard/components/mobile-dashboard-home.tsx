@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -92,6 +92,15 @@ function MonthlyRow({
   )
 }
 
+function MonthlyGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-md border bg-background px-3">
+      <p className="border-b py-2 text-xs font-semibold text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  )
+}
+
 function QuickLink({
   href,
   label,
@@ -138,7 +147,7 @@ function MobileQuickSummary({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground">Hoje</p>
-            <h2 className="text-base font-semibold tracking-normal text-foreground">Resumo rapido</h2>
+            <h2 className="text-base font-semibold tracking-normal text-foreground">Resumo rápido</h2>
           </div>
           <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={onRetryLive}>
             <RefreshCcw className="h-3.5 w-3.5" />
@@ -149,13 +158,13 @@ function MobileQuickSummary({
         {isLiveLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner className="h-4 w-4" />
-            Carregando posicao...
+            Carregando posição...
           </div>
         )}
 
         {isLiveError && (
           <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-            Nao foi possivel carregar a posicao financeira.
+            Não foi possível carregar a posição financeira.
           </div>
         )}
 
@@ -210,39 +219,54 @@ function MobileQuickSummary({
   )
 }
 
+function formatMonthYear(monthly: DashboardMonthly) {
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+    .format(new Date(monthly.year, monthly.month - 1, 1))
+    .replace(/^./, (char) => char.toUpperCase())
+}
+
 function MobileMonthlySummary({ monthly }: { monthly?: DashboardMonthly }) {
   if (!monthly) return null
 
   const payrollEmployees = monthly.payroll.employees
+  const monthLabel = formatMonthYear(monthly)
 
   return (
     <Card>
       <CardHeader className="p-3 pb-2">
-        <CardTitle className="text-base tracking-normal">Visão mensal</CardTitle>
-        <p className="text-xs text-muted-foreground">Resumo do mês selecionado.</p>
+        <CardTitle className="text-base tracking-normal">Visão mensal — {monthLabel}</CardTitle>
+        <p className="text-xs text-muted-foreground">Entradas, saídas e resultado do período.</p>
       </CardHeader>
       <CardContent className="space-y-3 p-3 pt-0">
-        <div className="rounded-md border bg-background px-3">
+        <MonthlyGroup title="Entradas">
           <MonthlyRow label="Receitas realizadas" value={formatCurrency(monthly.realizedRevenue)} tone="positive" />
           <MonthlyRow label="Receitas pendentes" value={formatCurrency(monthly.pendingRevenue)} />
-          <MonthlyRow label="Saidas pagas" value={formatCurrency(monthly.realizedOutflows)} tone="negative" />
+        </MonthlyGroup>
+
+        <MonthlyGroup title="Saídas">
+          <MonthlyRow label="Saídas pagas" value={formatCurrency(monthly.realizedOutflows)} tone="negative" />
           <MonthlyRow
             label="Pendentes"
             value={formatCurrency(monthly.pendingExpenses + monthly.pendingBills)}
             tone="warning"
+          />
+          <MonthlyRow label="Folha prevista" value={formatCurrency(monthly.payroll.payrollExpected)} />
+          <MonthlyRow label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
+          <MonthlyRow label="Falta pagar folha" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
+        </MonthlyGroup>
+
+        <MonthlyGroup title="Resultado">
+          <MonthlyRow
+            label="Resultado realizado"
+            value={formatCurrency(monthly.realizedResult)}
+            tone={monthly.realizedResult >= 0 ? 'positive' : 'negative'}
           />
           <MonthlyRow
             label="Resultado previsto"
             value={formatCurrency(monthly.projectedResult)}
             tone={monthly.projectedResult >= 0 ? 'positive' : 'negative'}
           />
-        </div>
-
-        <div className="rounded-md border bg-background px-3">
-          <MonthlyRow label="Folha prevista" value={formatCurrency(monthly.payroll.payrollExpected)} />
-          <MonthlyRow label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
-          <MonthlyRow label="Falta pagar" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
-        </div>
+        </MonthlyGroup>
 
         <details className="rounded-md border bg-background">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-medium">
