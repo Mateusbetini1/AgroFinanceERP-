@@ -104,11 +104,13 @@ function SummaryPill({
   value,
   count,
   tone,
+  mobile = false,
 }: {
   label: string
   value: number
   count: number
   tone: 'danger' | 'warning' | 'default' | 'positive'
+  mobile?: boolean
 }) {
   if (count === 0 && value === 0) return null
 
@@ -120,12 +122,12 @@ function SummaryPill({
   }[tone]
 
   return (
-    <div className={cn('rounded-md border p-2.5', toneClass)}>
-      <div className="flex items-center justify-between gap-2">
+    <div className={cn('rounded-md border p-2.5', mobile && 'flex items-center justify-between gap-3', toneClass)}>
+      <div className={cn('min-w-0', !mobile && 'flex items-center justify-between gap-2')}>
         <p className="text-xs font-medium">{label}</p>
         <span className="text-[11px]">{countLabel(count)}</span>
       </div>
-      <p className="mt-1 text-sm font-semibold text-foreground">{formatCurrency(value)}</p>
+      <p className={cn('text-sm font-semibold text-foreground', !mobile && 'mt-1')}>{formatCurrency(value)}</p>
     </div>
   )
 }
@@ -147,20 +149,24 @@ function AlertItemRow({
       className={cn(
         'flex min-w-0 items-start justify-between gap-3 rounded-md border p-3 text-sm transition-colors',
         rowTone(item),
-        compact && 'p-2.5',
+        compact && 'p-2.5 text-sm',
       )}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={overdue ? 'destructive' : 'outline'}>{itemTypeLabel(item.type)}</Badge>
-          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', severityClass(item.severity))}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={overdue ? 'destructive' : 'outline'} className={compact ? 'px-2 py-0 text-[11px]' : undefined}>
+            {itemTypeLabel(item.type)}
+          </Badge>
+          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', compact && 'text-[11px]', severityClass(item.severity))}>
             {overdue ? 'Vencido' : dueText(item, groupKey)}
           </span>
         </div>
-        <p className={cn('mt-2 line-clamp-2 font-medium', overdue ? 'text-rose-800' : 'text-foreground')}>
-          {itemTitle(item, groupKey)}
+        <p className={cn('mt-1.5 line-clamp-1 font-medium', overdue ? 'text-rose-800' : 'text-foreground')}>
+          {compact ? item.title : itemTitle(item, groupKey)}
         </p>
-        {!compact && <p className="mt-1 truncate text-xs text-muted-foreground">{formatDate(item.date)}</p>}
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {compact ? item.description : formatDate(item.date)}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-2 text-right">
         <span className={cn('text-sm font-semibold', overdue ? 'text-rose-700' : 'text-foreground')}>
@@ -179,7 +185,7 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
   const links = actionLinks(group)
 
   return (
-    <div className={cn('space-y-2 rounded-md border p-3', mobile && 'p-2.5', group.key === 'OVERDUE' && 'border-rose-200 bg-rose-50/30')}>
+    <div className={cn('space-y-2 rounded-md border p-3', group.key === 'OVERDUE' && 'border-rose-200 bg-rose-50/30')}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cn('text-sm font-semibold', group.key === 'OVERDUE' ? 'text-rose-800' : 'text-foreground')}>
@@ -194,8 +200,8 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
           <Link
             href={links[0][0]}
             className={cn(
-              'inline-flex shrink-0 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent',
-              mobile ? 'h-7' : 'h-8',
+              'inline-flex shrink-0 items-center justify-center gap-1 rounded-md text-xs font-medium text-primary hover:underline',
+              mobile ? 'h-7 px-1' : 'h-8 border border-input bg-background px-2 hover:bg-accent hover:no-underline',
             )}
           >
             {links[0][1]}
@@ -217,8 +223,8 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
               key={href}
               href={href}
               className={cn(
-                'inline-flex items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent',
-                mobile ? 'h-7' : 'h-8',
+                'inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium text-primary hover:underline',
+                mobile ? 'h-7 px-1' : 'h-8 border border-input bg-background px-2 hover:bg-accent hover:no-underline',
               )}
             >
               {label}
@@ -264,30 +270,34 @@ export function AlertsCenter({ variant = 'desktop', className }: { variant?: Ale
         </div>
 
         {alerts && hasItems(groups) && (
-          <div className={cn('grid gap-2', mobile ? 'grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4')}>
+          <div className={cn('grid gap-2', mobile ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-4')}>
             <SummaryPill
               label="Vencidos"
               value={alerts.summary.totalOverdueAmount}
               count={alerts.summary.overdueCount}
               tone="danger"
+              mobile={mobile}
             />
             <SummaryPill
               label="Vencem hoje"
               value={alerts.summary.totalDueTodayAmount}
               count={alerts.summary.dueTodayCount}
               tone="warning"
+              mobile={mobile}
             />
             <SummaryPill
               label="Vencem amanhã"
               value={alerts.summary.totalDueTomorrowAmount}
               count={alerts.summary.dueTomorrowCount}
               tone="default"
+              mobile={mobile}
             />
             <SummaryPill
               label="A receber"
               value={getGroupTotal(receivables)}
               count={receivables?.items.length ?? 0}
               tone="positive"
+              mobile={mobile}
             />
             {!mobile && (
               <SummaryPill

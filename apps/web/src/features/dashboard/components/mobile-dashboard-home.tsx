@@ -49,24 +49,24 @@ function MobileMetricCard({
   featured?: boolean
 }) {
   return (
-    <div className={cn('rounded-md border bg-card p-2.5', featured && 'col-span-2')}>
-      <div className="flex items-start justify-between gap-2">
+    <div className={cn('rounded-md border bg-card p-3', featured && 'col-span-2')}>
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase text-muted-foreground">{title}</p>
-          <p className={cn('mt-1 break-words font-semibold tracking-normal text-foreground', featured ? 'text-xl' : 'text-base')}>
+          <p className="text-xs font-medium text-muted-foreground">{title}</p>
+          <p className={cn('mt-1 break-words font-semibold tracking-normal text-foreground', featured ? 'text-xl' : 'text-lg')}>
             {value}
           </p>
         </div>
-        <div className={cn('shrink-0 rounded-md border p-1.5', toneClass(tone))}>
-          <Icon className="h-3.5 w-3.5" />
+        <div className={cn('shrink-0 rounded-md border p-2', toneClass(tone))}>
+          <Icon className="h-4 w-4" />
         </div>
       </div>
-      {helper && <p className="mt-1 text-[11px] text-muted-foreground">{helper}</p>}
+      {helper && <p className="mt-1 text-xs text-muted-foreground">{helper}</p>}
     </div>
   )
 }
 
-function CompactMetric({
+function MonthlyRow({
   label,
   value,
   tone = 'default',
@@ -76,18 +76,18 @@ function CompactMetric({
   tone?: MobileTone
 }) {
   return (
-    <div className="rounded-md border bg-background p-2.5">
-      <p className="text-[11px] font-medium uppercase text-muted-foreground">{label}</p>
-      <p
+    <div className="flex items-center justify-between gap-4 border-b py-2.5 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span
         className={cn(
-          'mt-1 break-words text-sm font-semibold text-foreground',
+          'shrink-0 text-right text-sm font-semibold text-foreground',
           tone === 'positive' && 'text-emerald-700',
           tone === 'negative' && 'text-rose-700',
           tone === 'warning' && 'text-amber-700',
         )}
       >
         {value}
-      </p>
+      </span>
     </div>
   )
 }
@@ -134,7 +134,7 @@ function MobileQuickSummary({
 }) {
   return (
     <Card>
-      <CardContent className="space-y-3 p-3">
+      <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground">Hoje</p>
@@ -160,7 +160,7 @@ function MobileQuickSummary({
         )}
 
         {live && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <MobileMetricCard
               title="Saldo"
               value={formatCurrency(live.position.totalBalance)}
@@ -222,23 +222,29 @@ function MobileMonthlySummary({ monthly }: { monthly?: DashboardMonthly }) {
         <p className="text-xs text-muted-foreground">Resumo do mes selecionado.</p>
       </CardHeader>
       <CardContent className="space-y-3 p-3 pt-0">
-        <div className="grid grid-cols-2 gap-2">
-          <CompactMetric label="Receitas" value={formatCurrency(monthly.realizedRevenue)} tone="positive" />
-          <CompactMetric label="A receber" value={formatCurrency(monthly.pendingRevenue)} />
-          <CompactMetric label="Saidas pagas" value={formatCurrency(monthly.realizedOutflows)} tone="negative" />
-          <CompactMetric
+        <div className="rounded-md border bg-background px-3">
+          <MonthlyRow label="Receitas realizadas" value={formatCurrency(monthly.realizedRevenue)} tone="positive" />
+          <MonthlyRow label="Receitas pendentes" value={formatCurrency(monthly.pendingRevenue)} />
+          <MonthlyRow label="Saidas pagas" value={formatCurrency(monthly.realizedOutflows)} tone="negative" />
+          <MonthlyRow
             label="Pendentes"
             value={formatCurrency(monthly.pendingExpenses + monthly.pendingBills)}
             tone="warning"
           />
-          <CompactMetric label="Folha prev." value={formatCurrency(monthly.payroll.payrollExpected)} />
-          <CompactMetric label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
-          <CompactMetric label="Falta folha" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
-          <CompactMetric
-            label="Resultado"
+          <MonthlyRow label="Folha prevista" value={formatCurrency(monthly.payroll.payrollExpected)} />
+          <MonthlyRow label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
+          <MonthlyRow label="Falta pagar folha" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
+          <MonthlyRow
+            label="Resultado previsto"
             value={formatCurrency(monthly.projectedResult)}
             tone={monthly.projectedResult >= 0 ? 'positive' : 'negative'}
           />
+        </div>
+
+        <div className="rounded-md border bg-background px-3">
+          <MonthlyRow label="Folha prevista" value={formatCurrency(monthly.payroll.payrollExpected)} />
+          <MonthlyRow label="Folha paga" value={formatCurrency(monthly.payroll.payrollTotalPaid)} tone="negative" />
+          <MonthlyRow label="Falta pagar" value={formatCurrency(monthly.payroll.payrollRemaining)} tone="warning" />
         </div>
 
         <details className="rounded-md border bg-background">
