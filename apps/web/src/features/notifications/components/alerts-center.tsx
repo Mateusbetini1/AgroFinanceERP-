@@ -120,7 +120,7 @@ function SummaryPill({
   }[tone]
 
   return (
-    <div className={cn('rounded-md border p-3', toneClass)}>
+    <div className={cn('rounded-md border p-2.5', toneClass)}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium">{label}</p>
         <span className="text-[11px]">{countLabel(count)}</span>
@@ -179,7 +179,7 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
   const links = actionLinks(group)
 
   return (
-    <div className={cn('space-y-2 rounded-md border p-3', group.key === 'OVERDUE' && 'border-rose-200 bg-rose-50/30')}>
+    <div className={cn('space-y-2 rounded-md border p-3', mobile && 'p-2.5', group.key === 'OVERDUE' && 'border-rose-200 bg-rose-50/30')}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cn('text-sm font-semibold', group.key === 'OVERDUE' ? 'text-rose-800' : 'text-foreground')}>
@@ -193,7 +193,10 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
         {links.length === 1 && (
           <Link
             href={links[0][0]}
-            className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent"
+            className={cn(
+              'inline-flex shrink-0 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent',
+              mobile ? 'h-7' : 'h-8',
+            )}
           >
             {links[0][1]}
             <ExternalLink className="h-3.5 w-3.5" />
@@ -213,7 +216,10 @@ function GroupBlock({ group, mobile }: { group: NotificationAlertGroup; mobile: 
             <Link
               key={href}
               href={href}
-              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent"
+              className={cn(
+                'inline-flex items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent',
+                mobile ? 'h-7' : 'h-8',
+              )}
             >
               {label}
               <ExternalLink className="h-3.5 w-3.5" />
@@ -245,7 +251,7 @@ export function AlertsCenter({ variant = 'desktop', className }: { variant?: Ale
 
   return (
     <Card className={className}>
-      <CardHeader className={cn('space-y-3', mobile && 'p-4')}>
+      <CardHeader className={cn('space-y-3', mobile && 'p-3')}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -295,7 +301,7 @@ export function AlertsCenter({ variant = 'desktop', className }: { variant?: Ale
         )}
       </CardHeader>
 
-      <CardContent className={cn('space-y-4', mobile && 'p-4 pt-0')}>
+      <CardContent className={cn('space-y-4', mobile && 'space-y-3 p-3 pt-0')}>
         {alertsQuery.isLoading && (
           <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
             <Spinner className="h-4 w-4" />

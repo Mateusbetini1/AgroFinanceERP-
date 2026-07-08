@@ -106,17 +106,17 @@ export default function DashboardPage() {
   const payrollEmployees = query.data?.payroll.employees ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="space-y-4 lg:space-y-6">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-normal text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold tracking-normal text-foreground lg:text-2xl">Dashboard</h1>
+          <p className="hidden text-sm text-muted-foreground sm:block">
             Visão financeira atual, compromissos, projeções e folha de funcionários.
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="space-y-2">
+        <div className="grid grid-cols-[1fr_96px] gap-2 sm:flex sm:items-end sm:gap-3">
+          <div className="space-y-1 lg:space-y-2">
             <Label htmlFor="dashboard-month">Mês</Label>
             <Select id="dashboard-month" value={String(month)} onChange={(event) => setMonth(Number(event.target.value))}>
               {months.map((item) => (
@@ -127,7 +127,7 @@ export default function DashboardPage() {
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1 lg:space-y-2">
             <Label htmlFor="dashboard-year">Ano</Label>
             <Input
               id="dashboard-year"
@@ -139,7 +139,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+          <Button type="button" variant="outline" className="col-span-2 h-9 sm:col-span-1 sm:h-10" onClick={() => void query.refetch()}>
             <RefreshCcw className="h-4 w-4" />
             Atualizar mês
           </Button>
@@ -164,14 +164,18 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div>
+      <div className="hidden lg:block">
         <h2 className="text-xl font-semibold tracking-normal text-foreground">Visão mensal</h2>
         <p className="text-sm text-muted-foreground">
           Caixa realizado, pendências e folha do mês selecionado.
         </p>
       </div>
 
-      {query.isLoading && <LoadingGrid />}
+      {query.isLoading && (
+        <div className="hidden lg:block">
+          <LoadingGrid />
+        </div>
+      )}
 
       {query.isError && (
         <Card>
@@ -188,7 +192,7 @@ export default function DashboardPage() {
       )}
 
       {query.data && (
-        <>
+        <div className="hidden space-y-6 lg:block">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <KpiCard
               title="Receitas realizadas"
@@ -279,7 +283,7 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   )
