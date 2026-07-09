@@ -3,7 +3,7 @@ name: Daily Notifications
 on:
   schedule:
     # GitHub Actions usa UTC. 11:00 UTC = 08:00 em Brasilia.
-    - cron: '0 11 * * *'
+    - cron: '10 11 * * *'
   workflow_dispatch:
 
 jobs:
