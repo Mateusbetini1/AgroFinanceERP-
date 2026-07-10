@@ -169,6 +169,22 @@ enum SupplyUnit {
   @@map("supply_unit")
 }
 
+enum InputStockMovementType {
+  PURCHASE
+  APPLICATION
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+
+  @@map("input_stock_movement_type")
+}
+
+enum InputStockMovementDirection {
+  IN
+  OUT
+
+  @@map("input_stock_movement_direction")
+}
+
 enum FileType {
   PDF
   XML
@@ -258,6 +274,10 @@ model Company {
   memberships      Membership[]
   products         Product[]
   supplies         Supply[]
+  inputPurchases   InputPurchase[]
+  inputPurchaseLines InputPurchaseLine[]
+  inputStockBalances InputStockBalance[]
+  inputStockMovements InputStockMovement[]
   categories       Category[]
   suppliers        Supplier[]
   accounts         Account[]
@@ -471,6 +491,9 @@ model Supply {
   deletedAt               DateTime?      @map("deleted_at")
 
   company Company @relation(fields: [companyId], references: [id])
+  inputPurchaseLines InputPurchaseLine[]
+  inputStockBalances InputStockBalance[]
+  inputStockMovements InputStockMovement[]
 
   // Partial unique index manual em migration:
   // CREATE UNIQUE INDEX supplies_company_id_name_active_unique ON supplies (company_id, lower(name)) WHERE deleted_at IS NULL;
@@ -528,11 +551,107 @@ model Supplier {
   expenses   Expense[]
   bills      Bill[]
   billGroups BillGroup[]
+  inputPurchases InputPurchase[]
 
   // Partial unique index manual em migration:
   // CREATE UNIQUE INDEX suppliers_company_id_document_active_unique ON suppliers (company_id, document) WHERE deleted_at IS NULL;
   @@index([companyId, name])
   @@map("suppliers")
+}
+
+// ================================================================
+// INPUT PURCHASES AND STOCK
+// ================================================================
+
+model InputPurchase {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  supplierId     String?   @map("supplier_id")
+  purchaseDate   DateTime  @map("purchase_date")
+  documentNumber String?   @map("document_number")
+  totalAmount    Decimal   @db.Decimal(15, 2) @map("total_amount")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  items    InputPurchaseLine[]
+
+  @@index([companyId])
+  @@index([companyId, purchaseDate])
+  @@index([companyId, supplierId])
+  @@map("input_purchases")
+}
+
+model InputPurchaseLine {
+  id           String     @id @default(uuid())
+  companyId    String     @map("company_id")
+  purchaseId   String     @map("purchase_id")
+  supplyId     String     @map("supply_id")
+  quantity     Decimal    @db.Decimal(15, 3)
+  unit         SupplyUnit
+  quantityBase Decimal    @db.Decimal(15, 3) @map("quantity_base")
+  unitCostBase Decimal    @db.Decimal(15, 6) @map("unit_cost_base")
+  totalAmount  Decimal    @db.Decimal(15, 2) @map("total_amount")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  company   Company             @relation(fields: [companyId], references: [id])
+  purchase  InputPurchase       @relation(fields: [purchaseId], references: [id])
+  supply    Supply              @relation(fields: [supplyId], references: [id])
+  movements InputStockMovement[]
+
+  @@index([companyId])
+  @@index([purchaseId])
+  @@index([companyId, supplyId])
+  @@map("input_purchase_lines")
+}
+
+model InputStockBalance {
+  id              String   @id @default(uuid())
+  companyId       String   @map("company_id")
+  supplyId        String   @map("supply_id")
+  quantityBase    Decimal  @default(0) @db.Decimal(15, 3) @map("quantity_base")
+  averageCostBase Decimal  @default(0) @db.Decimal(15, 6) @map("average_cost_base")
+  totalValue      Decimal  @default(0) @db.Decimal(15, 2) @map("total_value")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  supply  Supply  @relation(fields: [supplyId], references: [id])
+
+  @@unique([companyId, supplyId])
+  @@index([companyId])
+  @@map("input_stock_balances")
+}
+
+model InputStockMovement {
+  id                   String                      @id @default(uuid())
+  companyId            String                      @map("company_id")
+  supplyId             String                      @map("supply_id")
+  type                 InputStockMovementType
+  direction            InputStockMovementDirection
+  quantityBase         Decimal                     @db.Decimal(15, 3) @map("quantity_base")
+  unitCostBase         Decimal                     @db.Decimal(15, 6) @map("unit_cost_base")
+  totalCost            Decimal                     @db.Decimal(15, 2) @map("total_cost")
+  balanceQuantityAfter Decimal                     @db.Decimal(15, 3) @map("balance_quantity_after")
+  balanceValueAfter    Decimal                     @db.Decimal(15, 2) @map("balance_value_after")
+  purchaseLineId       String?                     @map("purchase_line_id")
+  occurredAt           DateTime                    @map("occurred_at")
+  notes                String?
+  createdAt            DateTime                    @default(now()) @map("created_at")
+
+  company      Company            @relation(fields: [companyId], references: [id])
+  supply       Supply             @relation(fields: [supplyId], references: [id])
+  purchaseLine InputPurchaseLine? @relation(fields: [purchaseLineId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, supplyId])
+  @@index([companyId, occurredAt])
+  @@index([purchaseLineId])
+  @@map("input_stock_movements")
 }
 // ================================================================
 // ACCOUNT (Contas financeiras: Caixa, Banco do Brasil, Sicredi)

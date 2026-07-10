@@ -118,6 +118,24 @@ export function formatSupplyCategory(category: string | null | undefined): strin
   return labels[category] ?? category
 }
 
+export function formatInputStockMovementType(type: string | null | undefined): string {
+  if (!type) return '-'
+
+  const labels: Record<string, string> = {
+    PURCHASE: 'Compra',
+    APPLICATION: 'Aplicação',
+    ADJUSTMENT_IN: 'Ajuste entrada',
+    ADJUSTMENT_OUT: 'Ajuste saída',
+  }
+
+  return labels[type] ?? type
+}
+
+export function formatInputStockMovementDirection(direction: string | null | undefined): string {
+  if (!direction) return '-'
+  return direction === 'IN' ? 'Entrada' : direction === 'OUT' ? 'Saída' : direction
+}
+
 export function formatFarmLocationType(type: string | null | undefined): string {
   if (!type) return '-'
 

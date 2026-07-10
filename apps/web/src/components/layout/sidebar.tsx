@@ -18,10 +18,12 @@ import {
   Package,
   Receipt,
   Repeat,
+  ShoppingCart,
   Sprout,
   Tags,
   Truck,
   Users,
+  Warehouse,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -65,6 +67,8 @@ const menuGroups = [
     items: [
       { href: '/safras', label: 'Safras', icon: Sprout },
       { href: '/farm-locations', label: 'Talhões/Locais', icon: MapPin },
+      { href: '/input-purchases', label: 'Compras de Insumos', icon: ShoppingCart },
+      { href: '/input-stock', label: 'Estoque de Insumos', icon: Warehouse },
     ],
   },
   {

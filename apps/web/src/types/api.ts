@@ -147,6 +147,63 @@ export interface Supply {
   updatedAt: string
 }
 
+export interface InputPurchaseLine {
+  id: string
+  supplyId: string
+  supply: { id: string; name: string; category: SupplyCategory; baseUnit: SupplyUnit }
+  quantity: number | string
+  unit: SupplyUnit
+  quantityBase: number | string
+  unitCostBase: number | string
+  totalAmount: number | string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InputPurchase {
+  id: string
+  supplierId: string | null
+  supplier: { id: string; name: string } | null
+  purchaseDate: string
+  documentNumber: string | null
+  totalAmount: number | string
+  notes: string | null
+  items: InputPurchaseLine[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InputStockBalance {
+  id: string
+  supplyId: string
+  supply: { id: string; name: string; category: SupplyCategory; baseUnit: SupplyUnit; active: boolean }
+  quantityBase: number | string
+  averageCostBase: number | string
+  totalValue: number | string
+  createdAt: string
+  updatedAt: string
+}
+
+export type InputStockMovementType = 'PURCHASE' | 'APPLICATION' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'
+export type InputStockMovementDirection = 'IN' | 'OUT'
+
+export interface InputStockMovement {
+  id: string
+  supplyId: string
+  supply: { id: string; name: string; category: SupplyCategory; baseUnit: SupplyUnit }
+  type: InputStockMovementType
+  direction: InputStockMovementDirection
+  quantityBase: number | string
+  unitCostBase: number | string
+  totalCost: number | string
+  balanceQuantityAfter: number | string
+  balanceValueAfter: number | string
+  purchaseLineId: string | null
+  occurredAt: string
+  notes: string | null
+  createdAt: string
+}
+
 // ── Supplier ─────────────────────────────────────────────────────────────────
 
 export interface Supplier {
