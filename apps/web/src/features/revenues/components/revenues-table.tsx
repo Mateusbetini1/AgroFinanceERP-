@@ -5,10 +5,6 @@ import { formatCurrency, formatDate, formatDecimal, formatStatusLabel } from '@/
 import type { Revenue } from '@/types/api'
 import type { ReactNode } from 'react'
 
-type RevenueWithSafra = Revenue & {
-  safra?: { name: string } | null
-}
-
 function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
   if (!value || value === '-') return null
 
@@ -17,6 +13,19 @@ function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
       <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm text-foreground">{value}</div>
     </div>
+  )
+}
+
+function SafraName({ name }: { name?: string | null }) {
+  const label = name ?? 'Sem safra'
+
+  return (
+    <span
+      className={!name ? 'block max-w-[180px] truncate text-muted-foreground' : 'block max-w-[180px] truncate'}
+      title={label}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -31,8 +40,6 @@ function RevenueMobileCard({
   onEdit: (revenue: Revenue) => void
   onDelete: (revenue: Revenue) => void
 }) {
-  const safraName = (revenue as RevenueWithSafra).safra?.name
-
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -57,7 +64,7 @@ function RevenueMobileCard({
         <MobileMeta label="Prev./Recebimento" value={formatDate(revenue.receivedAt)} />
         <MobileMeta label="Cliente" value={revenue.client} />
         <MobileMeta label="Conta" value={revenue.account?.name} />
-        <MobileMeta label="Safra" value={safraName} />
+        <MobileMeta label="Safra" value={<SafraName name={revenue.safra?.name} />} />
       </div>
 
       <RowActions
@@ -82,6 +89,7 @@ export function RevenuesTable({
 }) {
   const columns: DataTableColumn<Revenue>[] = [
     { header: 'Produto', cell: (revenue) => <span className="font-medium">{revenue.product.name}</span> },
+    { header: 'Safra', cell: (revenue) => <SafraName name={revenue.safra?.name} /> },
     { header: 'Cliente', cell: (revenue) => revenue.client ?? '-' },
     { header: 'Quantidade', cell: (revenue) => formatDecimal(revenue.quantity, 2), className: 'text-right' },
     { header: 'Valor total', cell: (revenue) => formatCurrency(revenue.totalAmount), className: 'text-right' },

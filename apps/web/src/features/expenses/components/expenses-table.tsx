@@ -5,10 +5,6 @@ import { formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
 import type { Expense } from '@/types/api'
 import type { ReactNode } from 'react'
 
-type ExpenseWithSafra = Expense & {
-  safra?: { name: string } | null
-}
-
 function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
   if (!value || value === '-') return null
 
@@ -17,6 +13,19 @@ function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
       <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm text-foreground">{value}</div>
     </div>
+  )
+}
+
+function SafraName({ name }: { name?: string | null }) {
+  const label = name ?? 'Sem safra'
+
+  return (
+    <span
+      className={!name ? 'block max-w-[180px] truncate text-muted-foreground' : 'block max-w-[180px] truncate'}
+      title={label}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -37,8 +46,6 @@ function ExpenseMobileCard({
   onEdit: (expense: Expense) => void
   onDelete: (expense: Expense) => void
 }) {
-  const safraName = (expense as ExpenseWithSafra).safra?.name
-
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -63,7 +70,7 @@ function ExpenseMobileCard({
         <MobileMeta label="Categoria" value={expense.category.name} />
         <MobileMeta label="Fornecedor" value={expense.supplier?.name} />
         <MobileMeta label="Conta" value={expense.account?.name} />
-        <MobileMeta label="Safra" value={safraName} />
+        <MobileMeta label="Safra" value={<SafraName name={expense.safra?.name} />} />
       </div>
 
       <RowActions
@@ -89,6 +96,7 @@ export function ExpensesTable({
   const columns: DataTableColumn<Expense>[] = [
     { header: 'Descrição', cell: (expense) => <span className="font-medium">{expense.description}</span> },
     { header: 'Categoria', cell: (expense) => expense.category.name },
+    { header: 'Safra', cell: (expense) => <SafraName name={expense.safra?.name} /> },
     { header: 'Fornecedor', cell: (expense) => expense.supplier?.name ?? '-' },
     { header: 'Conta', cell: (expense) => expense.account?.name ?? '-' },
     { header: 'Valor', cell: (expense) => formatCurrency(expense.amount), className: 'text-right' },

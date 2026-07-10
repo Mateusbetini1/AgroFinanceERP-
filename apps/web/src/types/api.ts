@@ -147,6 +147,7 @@ export interface Revenue {
   receivedAt: string | null
   product: { id?: string; name: string }
   account: { id?: string; name: string; type?: AccountType } | null
+  safra: { id?: string; name: string } | null
   client: string | null
   quantity: number | string
   unitPrice: number | string
@@ -174,6 +175,7 @@ export interface Expense {
   category: { id?: string; name: string; type?: CategoryType }
   supplier: { id?: string; name: string } | null
   account: { id?: string; name: string; type?: AccountType } | null
+  safra: { id?: string; name: string } | null
   amount: number | string
   status: ExpenseStatus
   attachmentUrl: string | null

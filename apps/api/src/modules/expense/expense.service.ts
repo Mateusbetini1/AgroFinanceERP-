@@ -16,6 +16,7 @@ const EXPENSE_SELECT = {
   accountId: true,
   account: { select: { id: true, name: true, type: true } },
   safraId: true,
+  safra: { select: { id: true, name: true } },
   date: true,
   dueDate: true,
   paidAt: true,

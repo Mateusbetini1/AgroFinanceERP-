@@ -26,6 +26,19 @@ function MobileMeta({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
+function SafraName({ name }: { name?: string | null }) {
+  const label = name ?? 'Sem safra'
+
+  return (
+    <span
+      className={!name ? 'block max-w-[180px] truncate text-muted-foreground' : 'block max-w-[180px] truncate'}
+      title={label}
+    >
+      {label}
+    </span>
+  )
+}
+
 function parseDateOnly(date: string) {
   const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!match) return null
@@ -112,12 +125,11 @@ export function BillsTable({
       cell: (bill) => (
         <div>
           <p className="font-medium">{bill.description}</p>
-          <p className="text-xs text-muted-foreground">
-            {bill.category?.name ?? 'Sem categoria'} | {bill.safra?.name ?? 'Sem safra'}
-          </p>
+          <p className="text-xs text-muted-foreground">{bill.category?.name ?? 'Sem categoria'}</p>
         </div>
       ),
     },
+    { header: 'Safra', cell: (bill) => <SafraName name={bill.safra?.name} /> },
     { header: 'Fornecedor', cell: (bill) => bill.supplier?.name ?? '-' },
     { header: 'Conta', cell: (bill) => bill.account?.name ?? '-' },
     { header: 'Valor', cell: (bill) => formatCurrency(bill.amount), className: 'text-right' },
@@ -158,9 +170,7 @@ export function BillsTable({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="break-words text-sm font-semibold text-foreground">{bill.description}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {bill.category?.name ?? 'Sem categoria'} | {bill.safra?.name ?? 'Sem safra'}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{bill.category?.name ?? 'Sem categoria'}</p>
               </div>
               <Badge variant={dueState.badgeVariant} className="shrink-0">
                 {dueState.label}
@@ -195,7 +205,7 @@ export function BillsTable({
               <MobileMeta label="Fornecedor" value={bill.supplier?.name} />
               <MobileMeta label="Conta" value={bill.account?.name} />
               <MobileMeta label="Categoria" value={bill.category?.name} />
-              <MobileMeta label="Safra" value={bill.safra?.name} />
+              <MobileMeta label="Safra" value={<SafraName name={bill.safra?.name} />} />
             </div>
 
             <div className="border-t pt-3">
