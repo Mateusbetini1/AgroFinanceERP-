@@ -120,6 +120,33 @@ export interface Product {
   updatedAt: string
 }
 
+// ── Supply ───────────────────────────────────────────────────────────────────
+
+export type SupplyCategory =
+  | 'DEFENSIVE'
+  | 'FERTILIZER'
+  | 'SEED'
+  | 'SUBSTRATE'
+  | 'PACKAGING'
+  | 'FUEL'
+  | 'OTHER'
+
+export type SupplyUnit = 'KG' | 'G' | 'L' | 'ML' | 'UNIT' | 'BAG' | 'BOX'
+
+export interface Supply {
+  id: string
+  name: string
+  category: SupplyCategory
+  baseUnit: SupplyUnit
+  purchaseUnitDefault: SupplyUnit
+  packageSizeBaseQuantity: number | string | null
+  packageSizeUnit: SupplyUnit | null
+  active: boolean
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // ── Supplier ─────────────────────────────────────────────────────────────────
 
 export interface Supplier {

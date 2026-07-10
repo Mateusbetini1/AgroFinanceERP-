@@ -87,9 +87,12 @@ export function formatUnit(unit: string | null | undefined): string {
 
   const labels: Record<string, string> = {
     KG: 'kg',
+    G: 'g',
     BOX: 'Caixa',
     UNIT: 'Unidade',
     BAG: 'Saca',
+    L: 'Litro',
+    ML: 'ml',
     TON: 'Tonelada',
     LITER: 'Litro',
     METER: 'Metro',
@@ -97,6 +100,22 @@ export function formatUnit(unit: string | null | undefined): string {
   }
 
   return labels[unit] ?? unit
+}
+
+export function formatSupplyCategory(category: string | null | undefined): string {
+  if (!category) return '-'
+
+  const labels: Record<string, string> = {
+    DEFENSIVE: 'Defensivo',
+    FERTILIZER: 'Fertilizante',
+    SEED: 'Semente',
+    SUBSTRATE: 'Substrato',
+    PACKAGING: 'Embalagem',
+    FUEL: 'Combustível',
+    OTHER: 'Outro',
+  }
+
+  return labels[category] ?? category
 }
 
 export function formatFarmLocationType(type: string | null | undefined): string {

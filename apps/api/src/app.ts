@@ -10,6 +10,7 @@ import { requestLogger } from './shared/middleware/request-logger'
 import { authRouter } from './modules/auth/auth.router'
 import { companyRouter } from './modules/company/company.router'
 import { productRouter } from './modules/product/product.router'
+import { supplyRouter } from './modules/supply/supply.router'
 import { categoryRouter } from './modules/category/category.router'
 import { supplierRouter } from './modules/supplier/supplier.router'
 import { accountRouter } from './modules/account/account.router'
@@ -91,6 +92,7 @@ export function createApp() {
   app.use('/api/v1/auth', authRateLimit, authRouter)
   app.use('/api/v1/companies', companyRouter)
   app.use('/api/v1/products', productRouter)
+  app.use('/api/v1/supplies', supplyRouter)
   app.use('/api/v1/categories', categoryRouter)
   app.use('/api/v1/suppliers', supplierRouter)
   app.use('/api/v1/accounts', accountRouter)

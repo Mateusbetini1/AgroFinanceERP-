@@ -145,6 +145,30 @@ enum FarmLocationType {
   @@map("farm_location_type")
 }
 
+enum SupplyCategory {
+  DEFENSIVE
+  FERTILIZER
+  SEED
+  SUBSTRATE
+  PACKAGING
+  FUEL
+  OTHER
+
+  @@map("supply_category")
+}
+
+enum SupplyUnit {
+  KG
+  G
+  L
+  ML
+  UNIT
+  BAG
+  BOX
+
+  @@map("supply_unit")
+}
+
 enum FileType {
   PDF
   XML
@@ -233,6 +257,7 @@ model Company {
 
   memberships      Membership[]
   products         Product[]
+  supplies         Supply[]
   categories       Category[]
   suppliers        Supplier[]
   accounts         Account[]
@@ -424,6 +449,35 @@ model Product {
   @@index([companyId, active])
   @@index([companyId, categoryId])
   @@map("products")
+}
+
+// ================================================================
+// SUPPLY (Insumos de estoque)
+// ================================================================
+
+model Supply {
+  id                      String         @id @default(uuid())
+  companyId               String         @map("company_id")
+  name                    String
+  category                SupplyCategory
+  baseUnit                SupplyUnit     @map("base_unit")
+  purchaseUnitDefault     SupplyUnit     @map("purchase_unit_default")
+  packageSizeBaseQuantity Decimal?       @db.Decimal(15, 3) @map("package_size_base_quantity")
+  packageSizeUnit         SupplyUnit?    @map("package_size_unit")
+  active                  Boolean        @default(true)
+  notes                   String?
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  deletedAt               DateTime?      @map("deleted_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  // Partial unique index manual em migration:
+  // CREATE UNIQUE INDEX supplies_company_id_name_active_unique ON supplies (company_id, lower(name)) WHERE deleted_at IS NULL;
+  @@index([companyId])
+  @@index([companyId, active])
+  @@index([companyId, category])
+  @@map("supplies")
 }
 
 // ================================================================

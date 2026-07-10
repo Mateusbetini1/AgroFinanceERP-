@@ -44,6 +44,7 @@ export const prismaMock = {
   employee: createModelMock(),
   employeePayment: createModelMock(),
   product: createModelMock(),
+  supply: createModelMock(),
   category: createModelMock(),
   supplier: createModelMock(),
   safra: createModelMock(),
