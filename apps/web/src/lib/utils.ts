@@ -43,6 +43,18 @@ export function formatDecimal(value: number | string | null | undefined, decimal
   return Number(value).toFixed(decimals)
 }
 
+export function formatQuantity(value: number | string | null | undefined, maximumFractionDigits = 3): string {
+  if (value === null || value === undefined) return '-'
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return '-'
+
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  }).format(numericValue)
+}
+
 export function formatStatusLabel(status: string | null | undefined): string {
   if (!status) return '-'
 
@@ -89,10 +101,10 @@ export function formatUnit(unit: string | null | undefined): string {
   const labels: Record<string, string> = {
     KG: 'kg',
     G: 'g',
-    BOX: 'Caixa',
-    UNIT: 'Unidade',
-    BAG: 'Saca',
-    L: 'Litro',
+    BOX: 'caixa',
+    UNIT: 'un',
+    BAG: 'saco',
+    L: 'L',
     ML: 'ml',
     TON: 'Tonelada',
     LITER: 'Litro',

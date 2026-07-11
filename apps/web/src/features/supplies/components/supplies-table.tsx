@@ -1,12 +1,12 @@
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@/components/data/data-table'
 import { RowActions } from '@/components/data/row-actions'
-import { formatDecimal, formatStatusLabel, formatSupplyCategory, formatUnit } from '@/lib/utils'
+import { formatQuantity, formatStatusLabel, formatSupplyCategory, formatUnit } from '@/lib/utils'
 import type { Supply } from '@/types/api'
 
 function formatPackageSize(supply: Supply) {
-  if (!supply.packageSizeBaseQuantity || !supply.packageSizeUnit) return '-'
-  return `${formatDecimal(supply.packageSizeBaseQuantity, 3)} ${formatUnit(supply.packageSizeUnit)}`
+  if (!supply.packageSizeBaseQuantity || !supply.packageSizeUnit) return '—'
+  return `${formatQuantity(supply.packageSizeBaseQuantity)} ${formatUnit(supply.packageSizeUnit)}`
 }
 
 export function SuppliesTable({
@@ -73,6 +73,11 @@ export function SuppliesTable({
               <p className="text-xs font-medium uppercase text-muted-foreground">Compra padrão</p>
               <p className="mt-1 text-sm text-foreground">{formatUnit(supply.purchaseUnitDefault)}</p>
             </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Embalagem</p>
+            <p className="mt-1 text-sm text-foreground">{formatPackageSize(supply)}</p>
           </div>
 
           <RowActions

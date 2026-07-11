@@ -40,6 +40,7 @@ export function SupplyForm({ initialValue, isSubmitting, onSubmit, onCancel }: S
   const [active, setActive] = useState(true)
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const purchaseUnitNeedsPackageSize = purchaseUnitDefault === 'BAG' || purchaseUnitDefault === 'BOX'
 
   useEffect(() => {
     setName(initialValue?.name ?? '')
@@ -140,6 +141,7 @@ export function SupplyForm({ initialValue, isSubmitting, onSubmit, onCancel }: S
             Unidade base
             <RequiredMark />
           </Label>
+          <p className="text-xs leading-snug text-muted-foreground">Unidade usada para controlar estoque.</p>
           <Select
             id="supply-base-unit"
             className={formControlClass}
@@ -159,6 +161,7 @@ export function SupplyForm({ initialValue, isSubmitting, onSubmit, onCancel }: S
             Unidade padrão de compra
             <RequiredMark />
           </Label>
+          <p className="text-xs leading-snug text-muted-foreground">Como normalmente compra esse insumo.</p>
           <Select
             id="supply-purchase-unit"
             className={formControlClass}
@@ -175,14 +178,22 @@ export function SupplyForm({ initialValue, isSubmitting, onSubmit, onCancel }: S
 
         <div className="space-y-2">
           <Label htmlFor="supply-package-size">Tamanho da embalagem</Label>
+          <p className="text-xs leading-snug text-muted-foreground">
+            Quantidade convertida para a unidade base.
+          </p>
           <Input
             id="supply-package-size"
             className={formControlClass}
             inputMode="decimal"
             value={packageSizeBaseQuantity}
             onChange={(event) => setPackageSizeBaseQuantity(event.target.value)}
-            placeholder="Opcional"
+            placeholder={purchaseUnitNeedsPackageSize ? 'Ex.: 40' : 'Opcional'}
           />
+          <p className="text-xs leading-snug text-muted-foreground">
+            {purchaseUnitNeedsPackageSize
+              ? 'Informe para converter compras por saco ou caixa em estoque.'
+              : 'Opcional quando a compra já usa kg, g, L, ml ou un.'}
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -202,6 +213,10 @@ export function SupplyForm({ initialValue, isSubmitting, onSubmit, onCancel }: S
           </Select>
         </div>
       </div>
+
+      <p className="text-xs leading-snug text-muted-foreground">
+        Ex.: se compra em saco de 40 kg, escolha compra padrão = saco, tamanho = 40, unidade = kg.
+      </p>
 
       <OptionalSection>
         <div className="space-y-2">
