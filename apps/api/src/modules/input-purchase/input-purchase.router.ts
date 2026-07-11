@@ -7,6 +7,7 @@ import { anyMember, authorize } from '../../shared/middleware/authorize'
 import { validate } from '../../shared/middleware/validate'
 import { asyncHandler } from '../../shared/utils/async-handler'
 import {
+  cancelInputPurchaseSchema,
   createInputPurchaseSchema,
   inputPurchaseParamsSchema,
   listInputPurchasesSchema,
@@ -47,6 +48,23 @@ inputPurchaseRouter.post(
   asyncHandler(async (req, res) => {
     const purchase = await InputPurchaseService.create(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: purchase })
+  }),
+)
+
+// PATCH /api/v1/input-purchases/:id/cancel
+inputPurchaseRouter.patch(
+  '/:id/cancel',
+  inputPurchaseWriteAccess,
+  validate(inputPurchaseParamsSchema, 'params'),
+  validate(cancelInputPurchaseSchema),
+  asyncHandler(async (req, res) => {
+    const purchase = await InputPurchaseService.cancel(
+      req.company!.id,
+      req.params.id,
+      req.body,
+      req,
+    )
+    res.json({ success: true, data: purchase })
   }),
 )
 

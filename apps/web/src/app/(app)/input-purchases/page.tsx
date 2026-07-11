@@ -5,12 +5,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
-import { createInputPurchase, listInputPurchases, type InputPurchasePayload } from '@/features/input-purchases/api'
+import {
+  cancelInputPurchase,
+  createInputPurchase,
+  listInputPurchases,
+  type InputPurchasePayload,
+} from '@/features/input-purchases/api'
 import { InputPurchaseForm } from '@/features/input-purchases/components/input-purchase-form'
 import { InputPurchasesTable } from '@/features/input-purchases/components/input-purchases-table'
 import { listSuppliers } from '@/features/suppliers/api'
 import { listSupplies } from '@/features/supplies/api'
 import { getApiErrorMessage } from '@/lib/utils'
+import type { InputPurchase } from '@/types/api'
 
 export default function InputPurchasesPage() {
   const queryClient = useQueryClient()
@@ -23,6 +29,7 @@ export default function InputPurchasesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [cancelingId, setCancelingId] = useState<string | null>(null)
 
   const invalidate = async () => {
     await Promise.all([
@@ -42,6 +49,17 @@ export default function InputPurchasesPage() {
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
   })
 
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string | null }) => cancelInputPurchase(id, { reason }),
+    onMutate: ({ id }) => setCancelingId(id),
+    onSuccess: async () => {
+      await invalidate()
+      setFeedback({ type: 'success', message: 'Compra de insumo cancelada com sucesso.' })
+    },
+    onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
+    onSettled: () => setCancelingId(null),
+  })
+
   function openCreate() {
     setFeedback(null)
     setDialogOpen(true)
@@ -49,6 +67,17 @@ export default function InputPurchasesPage() {
 
   function handleSubmit(payload: InputPurchasePayload) {
     createMutation.mutate(payload)
+  }
+
+  function handleCancel(purchase: InputPurchase) {
+    if (purchase.status === 'CANCELED') return
+    const confirmed = window.confirm('Cancelar esta compra vai estornar a entrada de estoque. Deseja continuar?')
+    if (!confirmed) return
+
+    const reason = window.prompt('Motivo do cancelamento (opcional):')
+    if (reason === null) return
+
+    cancelMutation.mutate({ id: purchase.id, reason: reason.trim() || null })
   }
 
   return (
@@ -67,7 +96,7 @@ export default function InputPurchasesPage() {
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
-          <InputPurchasesTable purchases={purchases} />
+          <InputPurchasesTable purchases={purchases} cancelingId={cancelingId} onCancel={handleCancel} />
         </div>
       </ListPage>
 

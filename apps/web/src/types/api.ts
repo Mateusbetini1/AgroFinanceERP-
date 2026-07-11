@@ -167,6 +167,10 @@ export interface InputPurchase {
   purchaseDate: string
   documentNumber: string | null
   totalAmount: number | string
+  status: 'ACTIVE' | 'CANCELED'
+  canceledAt: string | null
+  canceledByUserId: string | null
+  cancelReason: string | null
   notes: string | null
   items: InputPurchaseLine[]
   createdAt: string
@@ -184,7 +188,7 @@ export interface InputStockBalance {
   updatedAt: string
 }
 
-export type InputStockMovementType = 'PURCHASE' | 'APPLICATION' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'
+export type InputStockMovementType = 'PURCHASE' | 'PURCHASE_CANCEL' | 'APPLICATION' | 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'
 export type InputStockMovementDirection = 'IN' | 'OUT'
 
 export interface InputStockMovement {

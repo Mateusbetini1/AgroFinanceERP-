@@ -1,12 +1,17 @@
 import type { Request } from 'express'
 import type { Prisma, Supply } from '@agrofinance/database'
-import { InputStockMovementDirection, InputStockMovementType } from '@agrofinance/database'
+import { InputPurchaseStatus, InputStockMovementDirection, InputStockMovementType } from '@agrofinance/database'
 import { AuditAction } from '@agrofinance/shared'
 import { prisma } from '../../config/prisma'
 import { AppError } from '../../shared/errors/AppError'
 import { writeAuditLog } from '../../shared/middleware/audit-log'
 import { getPaginationArgs, buildPaginatedResponse } from '../../shared/utils/pagination'
-import type { CreateInputPurchaseDto, InputPurchaseItemDto, ListInputPurchasesQuery } from './input-purchase.schemas'
+import type {
+  CancelInputPurchaseDto,
+  CreateInputPurchaseDto,
+  InputPurchaseItemDto,
+  ListInputPurchasesQuery,
+} from './input-purchase.schemas'
 
 const SUPPLY_FOR_PURCHASE_SELECT = {
   id: true,
@@ -23,6 +28,10 @@ const INPUT_PURCHASE_SELECT = {
   purchaseDate: true,
   documentNumber: true,
   totalAmount: true,
+  status: true,
+  canceledAt: true,
+  canceledByUserId: true,
+  cancelReason: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
@@ -50,6 +59,23 @@ const INPUT_PURCHASE_SELECT = {
   },
 } as const
 
+const INPUT_PURCHASE_CANCEL_SELECT = {
+  id: true,
+  companyId: true,
+  status: true,
+  purchaseDate: true,
+  documentNumber: true,
+  items: {
+    select: {
+      id: true,
+      supplyId: true,
+      quantityBase: true,
+      unitCostBase: true,
+      totalAmount: true,
+    },
+  },
+} as const
+
 type SupplyForPurchase = Pick<
   Supply,
   'id' | 'name' | 'baseUnit' | 'packageSizeBaseQuantity' | 'packageSizeUnit'
@@ -57,6 +83,11 @@ type SupplyForPurchase = Pick<
 
 function toNumber(value: unknown): number {
   return Number(value ?? 0)
+}
+
+function clampNearZero(value: number, decimals: number): number {
+  const epsilon = decimals === 2 ? 0.005 : 0.0005
+  return Math.abs(value) < epsilon ? 0 : value
 }
 
 function convertToBaseQuantity(supply: SupplyForPurchase, item: InputPurchaseItemDto): number {
@@ -301,5 +332,122 @@ export const InputPurchaseService = {
     })
 
     return purchase
+  },
+
+  async cancel(companyId: string, id: string, data: CancelInputPurchaseDto, req: Request) {
+    const reason = data.reason?.trim() || null
+
+    const canceled = await prisma.$transaction(async (tx) => {
+      const existing = await tx.inputPurchase.findFirst({
+        where: { id, companyId, deletedAt: null },
+        select: INPUT_PURCHASE_CANCEL_SELECT,
+      })
+
+      if (!existing) throw AppError.notFound('Compra de insumo')
+
+      if (existing.status === InputPurchaseStatus.CANCELED) {
+        throw AppError.conflict('Compra de insumo ja cancelada')
+      }
+
+      for (const line of existing.items) {
+        const originalMovement = await tx.inputStockMovement.findFirst({
+          where: {
+            companyId,
+            purchaseLineId: line.id,
+            type: InputStockMovementType.PURCHASE,
+            direction: InputStockMovementDirection.IN,
+          },
+          select: { id: true },
+        })
+
+        if (!originalMovement) {
+          throw AppError.conflict('Movimento original de compra nao encontrado para estorno')
+        }
+
+        const balance = await tx.inputStockBalance.findUnique({
+          where: {
+            companyId_supplyId: {
+              companyId,
+              supplyId: line.supplyId,
+            },
+          },
+        })
+
+        const currentQuantity = toNumber(balance?.quantityBase)
+        const currentValue = toNumber(balance?.totalValue)
+        const lineQuantity = toNumber(line.quantityBase)
+        const lineTotal = toNumber(line.totalAmount)
+
+        if (!balance || currentQuantity + 0.0005 < lineQuantity) {
+          throw AppError.conflict(
+            'Não é possível cancelar esta compra porque parte do estoque já foi consumida ou ajustada.',
+          )
+        }
+
+        const nextQuantity = clampNearZero(currentQuantity - lineQuantity, 3)
+        const nextValue = clampNearZero(currentValue - lineTotal, 2)
+
+        if (nextQuantity < 0 || nextValue < 0) {
+          throw AppError.conflict(
+            'Não é possível cancelar esta compra porque parte do estoque já foi consumida ou ajustada.',
+          )
+        }
+
+        const nextAverageCost = nextQuantity > 0 ? nextValue / nextQuantity : 0
+
+        await tx.inputStockBalance.update({
+          where: { id: balance.id },
+          data: {
+            quantityBase: nextQuantity,
+            totalValue: nextQuantity > 0 ? nextValue : 0,
+            averageCostBase: nextAverageCost,
+          },
+        })
+
+        await tx.inputStockMovement.create({
+          data: {
+            companyId,
+            supplyId: line.supplyId,
+            type: InputStockMovementType.PURCHASE_CANCEL,
+            direction: InputStockMovementDirection.OUT,
+            quantityBase: lineQuantity,
+            unitCostBase: toNumber(line.unitCostBase),
+            totalCost: lineTotal,
+            balanceQuantityAfter: nextQuantity,
+            balanceValueAfter: nextQuantity > 0 ? nextValue : 0,
+            purchaseLineId: line.id,
+            occurredAt: new Date(),
+            notes: reason ? `Cancelamento da compra: ${reason}` : 'Cancelamento da compra',
+          },
+        })
+      }
+
+      await tx.inputPurchase.update({
+        where: { id },
+        data: {
+          status: InputPurchaseStatus.CANCELED,
+          canceledAt: new Date(),
+          canceledByUserId: req.user?.id,
+          cancelReason: reason,
+        },
+      })
+
+      const result = await tx.inputPurchase.findFirst({
+        where: { id, companyId },
+        select: INPUT_PURCHASE_SELECT,
+      })
+
+      if (!result) throw AppError.notFound('Compra de insumo')
+      return result
+    })
+
+    await writeAuditLog(req, {
+      action: AuditAction.UPDATE,
+      entityType: 'InputPurchase',
+      entityId: id,
+      after: canceled,
+    })
+
+    return canceled
   },
 }

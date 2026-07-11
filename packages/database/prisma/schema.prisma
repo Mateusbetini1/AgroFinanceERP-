@@ -171,11 +171,19 @@ enum SupplyUnit {
 
 enum InputStockMovementType {
   PURCHASE
+  PURCHASE_CANCEL
   APPLICATION
   ADJUSTMENT_IN
   ADJUSTMENT_OUT
 
   @@map("input_stock_movement_type")
+}
+
+enum InputPurchaseStatus {
+  ACTIVE
+  CANCELED
+
+  @@map("input_purchase_status")
 }
 
 enum InputStockMovementDirection {
@@ -318,6 +326,7 @@ model User {
   pushSubscriptions PushSubscription[]
   reminderRules ReminderRule[]
   notificationDeliveries NotificationDelivery[]
+  canceledInputPurchases InputPurchase[]
 
   @@map("users")
 }
@@ -570,6 +579,10 @@ model InputPurchase {
   purchaseDate   DateTime  @map("purchase_date")
   documentNumber String?   @map("document_number")
   totalAmount    Decimal   @db.Decimal(15, 2) @map("total_amount")
+  status         InputPurchaseStatus @default(ACTIVE)
+  canceledAt     DateTime? @map("canceled_at")
+  canceledByUserId String? @map("canceled_by_user_id")
+  cancelReason   String?   @map("cancel_reason")
   notes          String?
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -577,9 +590,11 @@ model InputPurchase {
 
   company  Company   @relation(fields: [companyId], references: [id])
   supplier Supplier? @relation(fields: [supplierId], references: [id])
+  canceledByUser User? @relation(fields: [canceledByUserId], references: [id])
   items    InputPurchaseLine[]
 
   @@index([companyId])
+  @@index([companyId, status])
   @@index([companyId, purchaseDate])
   @@index([companyId, supplierId])
   @@map("input_purchases")

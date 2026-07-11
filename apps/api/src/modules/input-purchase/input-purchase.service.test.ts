@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { SupplyCategory, SupplyUnit } from '@agrofinance/database'
+import { InputPurchaseStatus, SupplyCategory, SupplyUnit } from '@agrofinance/database'
 import { InputPurchaseService } from './input-purchase.service'
 import { createInputPurchaseSchema } from './input-purchase.schemas'
 import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
@@ -9,7 +9,7 @@ const companyId = 'company-1'
 const purchaseDate = new Date('2026-07-10T00:00:00.000Z')
 
 function mockRequest(): Request {
-  return {} as Request
+  return { user: { id: 'user-1', email: 'user@example.com' } } as Request
 }
 
 function supply(overrides: Record<string, unknown> = {}) {
@@ -36,6 +36,26 @@ function purchase(overrides: Record<string, unknown> = {}) {
     createdAt: purchaseDate,
     updatedAt: purchaseDate,
     items: [],
+    ...overrides,
+  }
+}
+
+function cancelablePurchase(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'purchase-1',
+    companyId,
+    status: InputPurchaseStatus.ACTIVE,
+    purchaseDate,
+    documentNumber: 'NF-123',
+    items: [
+      {
+        id: 'line-1',
+        supplyId: 'supply-1',
+        quantityBase: 10,
+        unitCostBase: 10,
+        totalAmount: 100,
+      },
+    ],
     ...overrides,
   }
 }
@@ -348,5 +368,177 @@ describe('InputPurchaseService', () => {
     )
 
     expect(prismaMock.account.update).not.toHaveBeenCalled()
+  })
+
+  it('cancela compra válida', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(cancelablePurchase())
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 10,
+      totalValue: 100,
+    })
+
+    const result = await InputPurchaseService.cancel(
+      companyId,
+      'purchase-1',
+      { reason: 'Erro de lançamento' },
+      mockRequest(),
+    )
+
+    expect(result.status).toBe(InputPurchaseStatus.CANCELED)
+    expect(prismaMock.inputPurchase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'purchase-1' },
+        data: expect.objectContaining({
+          status: InputPurchaseStatus.CANCELED,
+          canceledByUserId: 'user-1',
+          cancelReason: 'Erro de lançamento',
+        }),
+      }),
+    )
+  })
+
+  it('cancelamento cria movimento de estorno', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(cancelablePurchase())
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 10,
+      totalValue: 100,
+    })
+
+    await InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest())
+
+    expect(prismaMock.inputStockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'PURCHASE_CANCEL',
+          direction: 'OUT',
+          quantityBase: 10,
+          unitCostBase: 10,
+          totalCost: 100,
+          purchaseLineId: 'line-1',
+        }),
+      }),
+    )
+  })
+
+  it('cancelamento reduz saldo e recalcula custo médio', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(cancelablePurchase())
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 20,
+      totalValue: 400,
+    })
+
+    await InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest())
+
+    expect(prismaMock.inputStockBalance.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          quantityBase: 10,
+          totalValue: 300,
+          averageCostBase: 30,
+        }),
+      }),
+    )
+  })
+
+  it('cancelamento não altera Account', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(cancelablePurchase())
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 10,
+      totalValue: 100,
+    })
+
+    await InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest())
+
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia compra de outra empresa', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(null)
+
+    await expect(
+      InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest()),
+    ).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it('bloqueia cancelamento duplicado', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(
+      cancelablePurchase({ status: InputPurchaseStatus.CANCELED }),
+    )
+
+    await expect(
+      InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest()),
+    ).rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
+  })
+
+  it('bloqueia cancelamento se saldo atual for menor que quantidade da compra', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(cancelablePurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 5,
+      totalValue: 50,
+    })
+
+    await expect(
+      InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest()),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Não é possível cancelar esta compra porque parte do estoque já foi consumida ou ajustada.',
+    })
+  })
+
+  it('cancela compra com múltiplos itens', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(
+        cancelablePurchase({
+          items: [
+            { id: 'line-1', supplyId: 'supply-1', quantityBase: 10, unitCostBase: 10, totalAmount: 100 },
+            { id: 'line-2', supplyId: 'supply-2', quantityBase: 5, unitCostBase: 16, totalAmount: 80 },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique
+      .mockResolvedValueOnce({ id: 'balance-1', quantityBase: 10, totalValue: 100 })
+      .mockResolvedValueOnce({ id: 'balance-2', quantityBase: 5, totalValue: 80 })
+
+    await InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest())
+
+    expect(prismaMock.inputStockBalance.update).toHaveBeenCalledTimes(2)
+    expect(prismaMock.inputStockMovement.create).toHaveBeenCalledTimes(2)
+  })
+
+  it('não apaga movimentos antigos no cancelamento', async () => {
+    prismaMock.inputPurchase.findFirst
+      .mockResolvedValueOnce(cancelablePurchase())
+      .mockResolvedValueOnce(purchase({ status: InputPurchaseStatus.CANCELED }))
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'movement-1' })
+    prismaMock.inputStockBalance.findUnique.mockResolvedValue({
+      id: 'balance-1',
+      quantityBase: 10,
+      totalValue: 100,
+    })
+
+    await InputPurchaseService.cancel(companyId, 'purchase-1', { reason: 'Cancelamento' }, mockRequest())
+
+    expect(prismaMock.inputStockMovement.delete).not.toHaveBeenCalled()
+    expect(prismaMock.inputStockMovement.deleteMany).not.toHaveBeenCalled()
   })
 })

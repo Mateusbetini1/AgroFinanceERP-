@@ -16,6 +16,10 @@ export interface InputPurchasePayload {
   items: InputPurchaseItemPayload[]
 }
 
+export interface CancelInputPurchasePayload {
+  reason?: string | null
+}
+
 function cleanInputPurchasePayload(payload: InputPurchasePayload): InputPurchasePayload {
   return {
     supplierId: payload.supplierId || null,
@@ -41,5 +45,12 @@ export async function createInputPurchase(payload: InputPurchasePayload) {
     '/input-purchases',
     cleanInputPurchasePayload(payload),
   )
+  return data.data
+}
+
+export async function cancelInputPurchase(id: string, payload: CancelInputPurchasePayload) {
+  const { data } = await api.patch<ApiResponse<InputPurchase>>(`/input-purchases/${id}/cancel`, {
+    reason: payload.reason || null,
+  })
   return data.data
 }

@@ -19,6 +19,10 @@ export const createInputPurchaseSchema = z.object({
     .min(1, 'Informe ao menos um item da compra'),
 })
 
+export const cancelInputPurchaseSchema = z.object({
+  reason: z.string().max(500, 'Motivo deve ter no máximo 500 caracteres').trim().nullable().optional(),
+})
+
 export const listInputPurchasesSchema = paginationSchema.extend({
   supplierId: uuidSchema.optional(),
   supplyId: uuidSchema.optional(),
@@ -30,4 +34,5 @@ export const inputPurchaseParamsSchema = z.object({ id: uuidSchema })
 
 export type InputPurchaseItemDto = z.infer<typeof inputPurchaseItemSchema>
 export type CreateInputPurchaseDto = z.infer<typeof createInputPurchaseSchema>
+export type CancelInputPurchaseDto = z.infer<typeof cancelInputPurchaseSchema>
 export type ListInputPurchasesQuery = z.infer<typeof listInputPurchasesSchema>

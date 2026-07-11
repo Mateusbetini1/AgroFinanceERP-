@@ -48,6 +48,7 @@ export function formatStatusLabel(status: string | null | undefined): string {
 
   const labels: Record<string, string> = {
     ACTIVE: 'Ativo',
+    CANCELED: 'Cancelada',
     INACTIVE: 'Inativo',
     PENDING: 'Pendente',
     IN_PROGRESS: 'Em andamento',
@@ -123,6 +124,7 @@ export function formatInputStockMovementType(type: string | null | undefined): s
 
   const labels: Record<string, string> = {
     PURCHASE: 'Compra',
+    PURCHASE_CANCEL: 'Cancelamento de compra',
     APPLICATION: 'Aplicação',
     ADJUSTMENT_IN: 'Ajuste entrada',
     ADJUSTMENT_OUT: 'Ajuste saída',
