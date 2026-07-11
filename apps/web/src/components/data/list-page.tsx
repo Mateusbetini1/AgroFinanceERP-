@@ -43,10 +43,12 @@ export function ListPage({
         </div>
         <div className="flex flex-wrap gap-2">
           {action}
-          <Button type="button" className="w-full sm:w-auto" disabled={!onNew} onClick={onNew}>
-            <Plus className="h-4 w-4" />
-            {newLabel}
-          </Button>
+          {onNew && (
+            <Button type="button" className="w-full sm:w-auto" onClick={onNew}>
+              <Plus className="h-4 w-4" />
+              {newLabel}
+            </Button>
+          )}
         </div>
       </div>
 

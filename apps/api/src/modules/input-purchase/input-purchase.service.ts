@@ -209,12 +209,13 @@ async function updateStockForLine(
 
 export const InputPurchaseService = {
   async list(companyId: string, query: ListInputPurchasesQuery) {
-    const { page, limit, supplierId, supplyId, dateFrom, dateTo } = query
+    const { page, limit, supplierId, supplyId, status, dateFrom, dateTo } = query
     const { skip, take } = getPaginationArgs({ page, limit })
 
     const where = {
       companyId,
       deletedAt: null,
+      ...(status === 'ALL' ? {} : { status: status ?? InputPurchaseStatus.ACTIVE }),
       ...(supplierId ? { supplierId } : {}),
       ...(dateFrom || dateTo
         ? {

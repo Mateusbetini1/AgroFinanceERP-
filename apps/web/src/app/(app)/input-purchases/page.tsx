@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListPage } from '@/components/data/list-page'
 import {
   cancelInputPurchase,
   createInputPurchase,
   listInputPurchases,
+  type InputPurchaseStatusFilter,
   type InputPurchasePayload,
 } from '@/features/input-purchases/api'
 import { InputPurchaseForm } from '@/features/input-purchases/components/input-purchase-form'
@@ -20,7 +22,11 @@ import type { InputPurchase } from '@/types/api'
 
 export default function InputPurchasesPage() {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['input-purchases'], queryFn: listInputPurchases })
+  const [statusFilter, setStatusFilter] = useState<InputPurchaseStatusFilter>('ACTIVE')
+  const query = useQuery({
+    queryKey: ['input-purchases', statusFilter],
+    queryFn: () => listInputPurchases(statusFilter),
+  })
   const suppliesQuery = useQuery({ queryKey: ['supplies'], queryFn: listSupplies })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const purchases = query.data?.data ?? []
@@ -93,6 +99,28 @@ export default function InputPurchasesPage() {
         onRetry={() => void query.refetch()}
         onNew={openCreate}
         newLabel="Nova compra"
+        action={
+          <div className="flex w-full rounded-md border p-1 sm:w-auto">
+            <Button
+              type="button"
+              variant={statusFilter === 'ACTIVE' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() => setStatusFilter('ACTIVE')}
+            >
+              Ativas
+            </Button>
+            <Button
+              type="button"
+              variant={statusFilter === 'ALL' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() => setStatusFilter('ALL')}
+            >
+              Todas
+            </Button>
+          </div>
+        }
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}

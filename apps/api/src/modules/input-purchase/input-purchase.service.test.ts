@@ -2,7 +2,7 @@ import type { Request } from 'express'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { InputPurchaseStatus, SupplyCategory, SupplyUnit } from '@agrofinance/database'
 import { InputPurchaseService } from './input-purchase.service'
-import { createInputPurchaseSchema } from './input-purchase.schemas'
+import { createInputPurchaseSchema, listInputPurchasesSchema } from './input-purchase.schemas'
 import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 
 const companyId = 'company-1'
@@ -540,5 +540,69 @@ describe('InputPurchaseService', () => {
 
     expect(prismaMock.inputStockMovement.delete).not.toHaveBeenCalled()
     expect(prismaMock.inputStockMovement.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('GET sem status retorna apenas compras ACTIVE', async () => {
+    prismaMock.inputPurchase.findMany.mockResolvedValue([purchase({ status: InputPurchaseStatus.ACTIVE })])
+    prismaMock.inputPurchase.count.mockResolvedValue(1)
+
+    await InputPurchaseService.list(companyId, { page: 1, limit: 10 })
+
+    expect(prismaMock.inputPurchase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: InputPurchaseStatus.ACTIVE }),
+      }),
+    )
+  })
+
+  it('GET status=ACTIVE retorna apenas compras ACTIVE', async () => {
+    prismaMock.inputPurchase.findMany.mockResolvedValue([purchase({ status: InputPurchaseStatus.ACTIVE })])
+    prismaMock.inputPurchase.count.mockResolvedValue(1)
+
+    await InputPurchaseService.list(companyId, {
+      page: 1,
+      limit: 10,
+      status: InputPurchaseStatus.ACTIVE,
+    })
+
+    expect(prismaMock.inputPurchase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: InputPurchaseStatus.ACTIVE }),
+      }),
+    )
+  })
+
+  it('GET status=CANCELED retorna apenas compras canceladas', async () => {
+    prismaMock.inputPurchase.findMany.mockResolvedValue([purchase({ status: InputPurchaseStatus.CANCELED })])
+    prismaMock.inputPurchase.count.mockResolvedValue(1)
+
+    await InputPurchaseService.list(companyId, {
+      page: 1,
+      limit: 10,
+      status: InputPurchaseStatus.CANCELED,
+    })
+
+    expect(prismaMock.inputPurchase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: InputPurchaseStatus.CANCELED }),
+      }),
+    )
+  })
+
+  it('GET status=ALL retorna todas as compras', async () => {
+    prismaMock.inputPurchase.findMany.mockResolvedValue([purchase()])
+    prismaMock.inputPurchase.count.mockResolvedValue(1)
+
+    await InputPurchaseService.list(companyId, { page: 1, limit: 10, status: 'ALL' })
+
+    expect(prismaMock.inputPurchase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({ status: expect.anything() }),
+      }),
+    )
+  })
+
+  it('status inválido é rejeitado pela validação da query', () => {
+    expect(() => listInputPurchasesSchema.parse({ status: 'INVALID' })).toThrow()
   })
 })

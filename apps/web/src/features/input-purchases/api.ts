@@ -20,6 +20,8 @@ export interface CancelInputPurchasePayload {
   reason?: string | null
 }
 
+export type InputPurchaseStatusFilter = 'ACTIVE' | 'CANCELED' | 'ALL'
+
 function cleanInputPurchasePayload(payload: InputPurchasePayload): InputPurchasePayload {
   return {
     supplierId: payload.supplierId || null,
@@ -35,8 +37,10 @@ function cleanInputPurchasePayload(payload: InputPurchasePayload): InputPurchase
   }
 }
 
-export async function listInputPurchases() {
-  const { data } = await api.get<PaginatedResponse<InputPurchase>>('/input-purchases')
+export async function listInputPurchases(status: InputPurchaseStatusFilter = 'ACTIVE') {
+  const { data } = await api.get<PaginatedResponse<InputPurchase>>('/input-purchases', {
+    params: { status },
+  })
   return data
 }
 

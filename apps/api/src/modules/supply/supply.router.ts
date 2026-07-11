@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { MembershipRole } from '@agrofinance/database'
 import { SupplyService } from './supply.service'
+import { InputStockService } from '../input-stock/input-stock.service'
 import { authenticate } from '../../shared/middleware/authenticate'
 import { requireCompany } from '../../shared/middleware/require-company'
 import { anyMember, authorize } from '../../shared/middleware/authorize'
@@ -13,6 +14,10 @@ import {
   supplyParamsSchema,
   type ListSuppliesQuery,
 } from './supply.schemas'
+import {
+  listInputStockMovementsSchema,
+  type ListInputStockMovementsQuery,
+} from '../input-stock/input-stock.schemas'
 
 export const supplyRouter = Router()
 
@@ -50,6 +55,22 @@ supplyRouter.post(
   asyncHandler(async (req, res) => {
     const supply = await SupplyService.create(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: supply })
+  }),
+)
+
+// GET /api/v1/supplies/:id
+supplyRouter.get(
+  '/:id/movements',
+  anyMember,
+  validate(supplyParamsSchema, 'params'),
+  validate(listInputStockMovementsSchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const result = await InputStockService.listSupplyMovements(
+      req.company!.id,
+      req.params.id,
+      req.query as unknown as ListInputStockMovementsQuery,
+    )
+    res.json({ success: true, ...result })
   }),
 )
 

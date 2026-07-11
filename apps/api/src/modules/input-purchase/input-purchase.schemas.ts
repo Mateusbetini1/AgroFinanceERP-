@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SupplyUnit } from '@agrofinance/database'
+import { InputPurchaseStatus, SupplyUnit } from '@agrofinance/database'
 import { paginationSchema, uuidSchema } from '@agrofinance/shared'
 
 export const inputPurchaseItemSchema = z.object({
@@ -26,6 +26,7 @@ export const cancelInputPurchaseSchema = z.object({
 export const listInputPurchasesSchema = paginationSchema.extend({
   supplierId: uuidSchema.optional(),
   supplyId: uuidSchema.optional(),
+  status: z.enum([InputPurchaseStatus.ACTIVE, InputPurchaseStatus.CANCELED, 'ALL']).optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
 })
