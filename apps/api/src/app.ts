@@ -12,6 +12,7 @@ import { companyRouter } from './modules/company/company.router'
 import { productRouter } from './modules/product/product.router'
 import { supplyRouter } from './modules/supply/supply.router'
 import { inputPurchaseRouter } from './modules/input-purchase/input-purchase.router'
+import { inputApplicationRouter } from './modules/input-application/input-application.router'
 import { inputStockRouter } from './modules/input-stock/input-stock.router'
 import { categoryRouter } from './modules/category/category.router'
 import { supplierRouter } from './modules/supplier/supplier.router'
@@ -96,6 +97,7 @@ export function createApp() {
   app.use('/api/v1/products', productRouter)
   app.use('/api/v1/supplies', supplyRouter)
   app.use('/api/v1/input-purchases', inputPurchaseRouter)
+  app.use('/api/v1/input-applications', inputApplicationRouter)
   app.use('/api/v1/input-stock', inputStockRouter)
   app.use('/api/v1/categories', categoryRouter)
   app.use('/api/v1/suppliers', supplierRouter)

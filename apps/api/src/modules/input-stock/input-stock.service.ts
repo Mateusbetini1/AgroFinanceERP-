@@ -40,6 +40,14 @@ const INPUT_STOCK_MOVEMENT_SELECT = {
   balanceQuantityAfter: true,
   balanceValueAfter: true,
   purchaseLineId: true,
+  applicationAllocationId: true,
+  applicationAllocation: {
+    select: {
+      id: true,
+      safra: { select: { id: true, name: true } },
+      farmLocation: { select: { id: true, name: true } },
+    },
+  },
   occurredAt: true,
   notes: true,
   createdAt: true,

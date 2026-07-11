@@ -47,6 +47,8 @@ export const prismaMock = {
   supply: createModelMock(),
   inputPurchase: createModelMock(),
   inputPurchaseLine: createModelMock(),
+  inputApplication: createModelMock(),
+  inputApplicationAllocation: createModelMock(),
   inputStockBalance: createModelMock(),
   inputStockMovement: createModelMock(),
   category: createModelMock(),

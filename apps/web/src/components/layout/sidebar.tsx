@@ -11,6 +11,7 @@ import {
   CreditCard,
   FileText,
   FlaskConical,
+  ClipboardPenLine,
   HandCoins,
   Home,
   ListChecks,
@@ -57,7 +58,6 @@ const menuGroups = [
       { href: '/accounts', label: 'Contas', icon: CreditCard },
       { href: '/categories', label: 'Categorias', icon: Tags },
       { href: '/products', label: 'Produtos', icon: Package },
-      { href: '/supplies', label: 'Insumos', icon: FlaskConical },
       { href: '/suppliers', label: 'Fornecedores', icon: Truck },
       { href: '/employees', label: 'Funcionários', icon: Users },
     ],
@@ -67,8 +67,10 @@ const menuGroups = [
     items: [
       { href: '/safras', label: 'Safras', icon: Sprout },
       { href: '/farm-locations', label: 'Talhões/Locais', icon: MapPin },
+      { href: '/supplies', label: 'Insumos', icon: FlaskConical },
       { href: '/input-purchases', label: 'Compras de Insumos', icon: ShoppingCart },
       { href: '/input-stock', label: 'Estoque de Insumos', icon: Warehouse },
+      { href: '/input-applications', label: 'Aplicações de Insumos', icon: ClipboardPenLine },
     ],
   },
   {

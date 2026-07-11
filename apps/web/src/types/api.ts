@@ -203,9 +203,44 @@ export interface InputStockMovement {
   balanceQuantityAfter: number | string
   balanceValueAfter: number | string
   purchaseLineId: string | null
+  applicationAllocationId: string | null
+  applicationAllocation: {
+    id: string
+    safra: { id: string; name: string }
+    farmLocation: { id: string; name: string } | null
+  } | null
   occurredAt: string
   notes: string | null
   createdAt: string
+}
+
+export interface InputApplicationAllocation {
+  id: string
+  safraId: string
+  safra: { id: string; name: string }
+  farmLocationId: string | null
+  farmLocation: { id: string; name: string; type?: FarmLocationType; active?: boolean } | null
+  quantityBase: number | string
+  unitCostBaseSnapshot: number | string
+  totalCost: number | string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InputApplication {
+  id: string
+  supplyId: string
+  supply: { id: string; name: string; category: SupplyCategory; baseUnit: SupplyUnit }
+  applicationDate: string
+  quantityBase: number | string
+  unit: SupplyUnit
+  originalQuantity: number | string
+  unitCostBaseSnapshot: number | string
+  totalCost: number | string
+  notes: string | null
+  allocations: InputApplicationAllocation[]
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Supplier ─────────────────────────────────────────────────────────────────

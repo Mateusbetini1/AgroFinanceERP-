@@ -284,6 +284,8 @@ model Company {
   supplies         Supply[]
   inputPurchases   InputPurchase[]
   inputPurchaseLines InputPurchaseLine[]
+  inputApplications InputApplication[]
+  inputApplicationAllocations InputApplicationAllocation[]
   inputStockBalances InputStockBalance[]
   inputStockMovements InputStockMovement[]
   categories       Category[]
@@ -501,6 +503,7 @@ model Supply {
 
   company Company @relation(fields: [companyId], references: [id])
   inputPurchaseLines InputPurchaseLine[]
+  inputApplications InputApplication[]
   inputStockBalances InputStockBalance[]
   inputStockMovements InputStockMovement[]
 
@@ -624,6 +627,56 @@ model InputPurchaseLine {
   @@map("input_purchase_lines")
 }
 
+model InputApplication {
+  id                   String    @id @default(uuid())
+  companyId            String    @map("company_id")
+  supplyId             String    @map("supply_id")
+  applicationDate      DateTime  @map("application_date")
+  quantityBase         Decimal   @db.Decimal(15, 3) @map("quantity_base")
+  unit                 SupplyUnit
+  originalQuantity     Decimal   @db.Decimal(15, 3) @map("original_quantity")
+  unitCostBaseSnapshot Decimal   @db.Decimal(15, 6) @map("unit_cost_base_snapshot")
+  totalCost            Decimal   @db.Decimal(15, 2) @map("total_cost")
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  company     Company @relation(fields: [companyId], references: [id])
+  supply      Supply  @relation(fields: [supplyId], references: [id])
+  allocations InputApplicationAllocation[]
+
+  @@index([companyId])
+  @@index([companyId, supplyId])
+  @@index([companyId, applicationDate])
+  @@map("input_applications")
+}
+
+model InputApplicationAllocation {
+  id                   String   @id @default(uuid())
+  companyId            String   @map("company_id")
+  applicationId        String   @map("application_id")
+  safraId              String   @map("safra_id")
+  farmLocationId       String?  @map("farm_location_id")
+  quantityBase         Decimal  @db.Decimal(15, 3) @map("quantity_base")
+  unitCostBaseSnapshot Decimal  @db.Decimal(15, 6) @map("unit_cost_base_snapshot")
+  totalCost            Decimal  @db.Decimal(15, 2) @map("total_cost")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  company      Company          @relation(fields: [companyId], references: [id])
+  application  InputApplication @relation(fields: [applicationId], references: [id])
+  safra        Safra            @relation(fields: [safraId], references: [id])
+  farmLocation FarmLocation?    @relation(fields: [farmLocationId], references: [id])
+  movements    InputStockMovement[]
+
+  @@index([companyId])
+  @@index([companyId, safraId])
+  @@index([companyId, farmLocationId])
+  @@index([applicationId])
+  @@map("input_application_allocations")
+}
+
 model InputStockBalance {
   id              String   @id @default(uuid())
   companyId       String   @map("company_id")
@@ -654,18 +707,21 @@ model InputStockMovement {
   balanceQuantityAfter Decimal                     @db.Decimal(15, 3) @map("balance_quantity_after")
   balanceValueAfter    Decimal                     @db.Decimal(15, 2) @map("balance_value_after")
   purchaseLineId       String?                     @map("purchase_line_id")
+  applicationAllocationId String?                   @map("application_allocation_id")
   occurredAt           DateTime                    @map("occurred_at")
   notes                String?
   createdAt            DateTime                    @default(now()) @map("created_at")
 
-  company      Company            @relation(fields: [companyId], references: [id])
-  supply       Supply             @relation(fields: [supplyId], references: [id])
-  purchaseLine InputPurchaseLine? @relation(fields: [purchaseLineId], references: [id])
+  company               Company                     @relation(fields: [companyId], references: [id])
+  supply                Supply                      @relation(fields: [supplyId], references: [id])
+  purchaseLine          InputPurchaseLine?          @relation(fields: [purchaseLineId], references: [id])
+  applicationAllocation InputApplicationAllocation? @relation(fields: [applicationAllocationId], references: [id])
 
   @@index([companyId])
   @@index([companyId, supplyId])
   @@index([companyId, occurredAt])
   @@index([purchaseLineId])
+  @@index([applicationAllocationId])
   @@map("input_stock_movements")
 }
 // ================================================================
@@ -768,6 +824,7 @@ model FarmLocation {
 
   company Company @relation(fields: [companyId], references: [id])
   safras  Safra[]
+  inputApplicationAllocations InputApplicationAllocation[]
 
   @@index([companyId])
   @@index([companyId, active])
@@ -799,6 +856,7 @@ model Safra {
   revenues     Revenue[]
   expenses     Expense[]
   bills        Bill[]
+  inputApplicationAllocations InputApplicationAllocation[]
 
   @@index([companyId])
   @@index([companyId, status])
