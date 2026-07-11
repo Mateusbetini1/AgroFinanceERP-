@@ -63,6 +63,7 @@ const INPUT_PURCHASE_CANCEL_SELECT = {
   id: true,
   companyId: true,
   status: true,
+  canceledAt: true,
   purchaseDate: true,
   documentNumber: true,
   items: {
@@ -450,5 +451,71 @@ export const InputPurchaseService = {
     })
 
     return canceled
+  },
+
+  async deletePermanent(companyId: string, id: string, req: Request) {
+    const deleted = await prisma.$transaction(async (tx) => {
+      const existing = await tx.inputPurchase.findFirst({
+        where: { id, companyId, deletedAt: null },
+        select: INPUT_PURCHASE_CANCEL_SELECT,
+      })
+
+      if (!existing) throw AppError.notFound('Compra de insumo')
+
+      if (existing.status !== InputPurchaseStatus.CANCELED) {
+        throw AppError.conflict('Cancele a compra antes de excluir permanentemente.')
+      }
+
+      if (!existing.canceledAt) {
+        throw AppError.conflict(
+          'Nao e possivel excluir permanentemente esta compra porque o cancelamento nao possui data registrada.',
+        )
+      }
+
+      const lineIds = existing.items.map((line) => line.id)
+      const supplyIds = Array.from(new Set(existing.items.map((line) => line.supplyId)))
+
+      if (supplyIds.length > 0) {
+        const laterMovement = await tx.inputStockMovement.findFirst({
+          where: {
+            companyId,
+            supplyId: { in: supplyIds },
+            purchaseLineId: { notIn: lineIds },
+            occurredAt: { gt: existing.canceledAt },
+          },
+          select: { id: true },
+        })
+
+        if (laterMovement) {
+          throw AppError.conflict(
+            'Nao e possivel excluir permanentemente esta compra porque existem movimentacoes posteriores do estoque.',
+          )
+        }
+      }
+
+      await tx.inputStockMovement.deleteMany({
+        where: {
+          companyId,
+          purchaseLineId: { in: lineIds },
+        },
+      })
+
+      await tx.inputPurchaseLine.deleteMany({
+        where: { companyId, purchaseId: id },
+      })
+
+      await tx.inputPurchase.delete({
+        where: { id },
+      })
+
+      return existing
+    })
+
+    await writeAuditLog(req, {
+      action: AuditAction.DELETE,
+      entityType: 'InputPurchase',
+      entityId: id,
+      before: deleted,
+    })
   },
 }

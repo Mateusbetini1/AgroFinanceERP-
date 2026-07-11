@@ -45,6 +45,7 @@ function cancelablePurchase(overrides: Record<string, unknown> = {}) {
     id: 'purchase-1',
     companyId,
     status: InputPurchaseStatus.ACTIVE,
+    canceledAt: null,
     purchaseDate,
     documentNumber: 'NF-123',
     items: [
@@ -58,6 +59,14 @@ function cancelablePurchase(overrides: Record<string, unknown> = {}) {
     ],
     ...overrides,
   }
+}
+
+function canceledPurchase(overrides: Record<string, unknown> = {}) {
+  return cancelablePurchase({
+    status: InputPurchaseStatus.CANCELED,
+    canceledAt: new Date('2026-07-11T00:00:00.000Z'),
+    ...overrides,
+  })
 }
 
 function mockPurchaseCreateResult() {
@@ -604,5 +613,124 @@ describe('InputPurchaseService', () => {
 
   it('status inválido é rejeitado pela validação da query', () => {
     expect(() => listInputPurchasesSchema.parse({ status: 'INVALID' })).toThrow()
+  })
+
+  it('bloqueia exclusao permanente de compra ACTIVE', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(cancelablePurchase())
+
+    await expect(
+      InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest()),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Cancele a compra antes de excluir permanentemente.',
+    })
+
+    expect(prismaMock.inputPurchase.delete).not.toHaveBeenCalled()
+  })
+
+  it('exclui permanentemente compra CANCELED', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(canceledPurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue(null)
+
+    await InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest())
+
+    expect(prismaMock.inputStockMovement.deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        purchaseLineId: { in: ['line-1'] },
+      },
+    })
+    expect(prismaMock.inputPurchaseLine.deleteMany).toHaveBeenCalledWith({
+      where: { companyId, purchaseId: 'purchase-1' },
+    })
+    expect(prismaMock.inputPurchase.delete).toHaveBeenCalledWith({ where: { id: 'purchase-1' } })
+  })
+
+  it('remove linhas e movimentos da compra cancelada', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(
+      canceledPurchase({
+        items: [
+          { id: 'line-1', supplyId: 'supply-1', quantityBase: 10, unitCostBase: 10, totalAmount: 100 },
+          { id: 'line-2', supplyId: 'supply-2', quantityBase: 5, unitCostBase: 16, totalAmount: 80 },
+        ],
+      }),
+    )
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue(null)
+
+    await InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest())
+
+    expect(prismaMock.inputStockMovement.deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        purchaseLineId: { in: ['line-1', 'line-2'] },
+      },
+    })
+    expect(prismaMock.inputPurchaseLine.deleteMany).toHaveBeenCalledWith({
+      where: { companyId, purchaseId: 'purchase-1' },
+    })
+  })
+
+  it('exclusao permanente nao altera InputStockBalance', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(canceledPurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue(null)
+
+    await InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest())
+
+    expect(prismaMock.inputStockBalance.update).not.toHaveBeenCalled()
+    expect(prismaMock.inputStockBalance.create).not.toHaveBeenCalled()
+  })
+
+  it('nao apaga movimentos de outras compras', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(canceledPurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue(null)
+
+    await InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest())
+
+    expect(prismaMock.inputStockMovement.deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        purchaseLineId: { in: ['line-1'] },
+      },
+    })
+  })
+
+  it('bloqueia exclusao permanente de compra de outra empresa', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(null)
+
+    await expect(
+      InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest()),
+    ).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it('retorna 404 ao excluir permanentemente compra inexistente', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(null)
+
+    await expect(
+      InputPurchaseService.deletePermanent(companyId, 'missing-purchase', mockRequest()),
+    ).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it('bloqueia exclusao permanente quando existem movimentacoes posteriores do estoque', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(canceledPurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue({ id: 'later-movement' })
+
+    await expect(
+      InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest()),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        'Nao e possivel excluir permanentemente esta compra porque existem movimentacoes posteriores do estoque.',
+    })
+
+    expect(prismaMock.inputPurchase.delete).not.toHaveBeenCalled()
+  })
+
+  it('exclusao permanente mantem Account sem alteracoes', async () => {
+    prismaMock.inputPurchase.findFirst.mockResolvedValue(canceledPurchase())
+    prismaMock.inputStockMovement.findFirst.mockResolvedValue(null)
+
+    await InputPurchaseService.deletePermanent(companyId, 'purchase-1', mockRequest())
+
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
   })
 })

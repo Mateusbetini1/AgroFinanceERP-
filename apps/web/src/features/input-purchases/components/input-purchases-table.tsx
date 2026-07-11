@@ -1,4 +1,4 @@
-import { XCircle } from 'lucide-react'
+import { Trash2, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/data/data-table'
@@ -22,34 +22,62 @@ function StatusBadge({ purchase }: { purchase: InputPurchase }) {
 export function InputPurchasesTable({
   purchases,
   cancelingId,
+  deletingPermanentId,
   onCancel,
+  onDeletePermanent,
 }: {
   purchases: InputPurchase[]
   cancelingId?: string | null
+  deletingPermanentId?: string | null
   onCancel: (purchase: InputPurchase) => void
+  onDeletePermanent: (purchase: InputPurchase) => void
 }) {
+  function renderAction(purchase: InputPurchase, className?: string) {
+    if (purchase.status === 'CANCELED') {
+      return (
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          className={className}
+          loading={deletingPermanentId === purchase.id}
+          onClick={() => onDeletePermanent(purchase)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir permanentemente
+        </Button>
+      )
+    }
+
+    return (
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        className={className}
+        loading={cancelingId === purchase.id}
+        onClick={() => onCancel(purchase)}
+      >
+        <XCircle className="h-4 w-4" />
+        Cancelar
+      </Button>
+    )
+  }
+
   const columns: DataTableColumn<InputPurchase>[] = [
     { header: 'Data', cell: (purchase) => formatDate(purchase.purchaseDate) },
     { header: 'Documento', cell: (purchase) => purchase.documentNumber ?? '-' },
     { header: 'Fornecedor', cell: (purchase) => purchase.supplier?.name ?? '-' },
     { header: 'Itens', cell: formatItems },
-    { header: 'Valor total', cell: (purchase) => formatCurrency(purchase.totalAmount), className: 'text-right' },
+    {
+      header: 'Valor total',
+      cell: (purchase) => formatCurrency(purchase.totalAmount),
+      className: 'text-right',
+    },
     { header: 'Status', cell: (purchase) => <StatusBadge purchase={purchase} /> },
     {
       header: 'Ações',
-      cell: (purchase) => (
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          loading={cancelingId === purchase.id}
-          disabled={purchase.status === 'CANCELED'}
-          onClick={() => onCancel(purchase)}
-        >
-          <XCircle className="h-4 w-4" />
-          Cancelar
-        </Button>
-      ),
+      cell: (purchase) => renderAction(purchase),
       className: 'text-right',
     },
   ]
@@ -85,17 +113,7 @@ export function InputPurchasesTable({
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="destructive"
-            className="w-full"
-            loading={cancelingId === purchase.id}
-            disabled={purchase.status === 'CANCELED'}
-            onClick={() => onCancel(purchase)}
-          >
-            <XCircle className="h-4 w-4" />
-            Cancelar
-          </Button>
+          {renderAction(purchase, 'w-full')}
         </div>
       )}
     />

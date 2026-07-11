@@ -9,6 +9,7 @@ import { ListPage } from '@/components/data/list-page'
 import {
   cancelInputPurchase,
   createInputPurchase,
+  deleteInputPurchasePermanent,
   listInputPurchases,
   type InputPurchaseStatusFilter,
   type InputPurchasePayload,
@@ -36,6 +37,7 @@ export default function InputPurchasesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
+  const [deletingPermanentId, setDeletingPermanentId] = useState<string | null>(null)
 
   const invalidate = async () => {
     await Promise.all([
@@ -66,6 +68,17 @@ export default function InputPurchasesPage() {
     onSettled: () => setCancelingId(null),
   })
 
+  const deletePermanentMutation = useMutation({
+    mutationFn: deleteInputPurchasePermanent,
+    onMutate: (id: string) => setDeletingPermanentId(id),
+    onSuccess: async () => {
+      await invalidate()
+      setFeedback({ type: 'success', message: 'Compra cancelada excluída permanentemente.' })
+    },
+    onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
+    onSettled: () => setDeletingPermanentId(null),
+  })
+
   function openCreate() {
     setFeedback(null)
     setDialogOpen(true)
@@ -84,6 +97,17 @@ export default function InputPurchasesPage() {
     if (reason === null) return
 
     cancelMutation.mutate({ id: purchase.id, reason: reason.trim() || null })
+  }
+
+  function handleDeletePermanent(purchase: InputPurchase) {
+    if (purchase.status !== 'CANCELED') return
+
+    const confirmed = window.confirm(
+      'Esta ação remove definitivamente a compra cancelada e suas movimentações. Use apenas para testes ou lançamentos feitos por engano. Deseja continuar?',
+    )
+    if (!confirmed) return
+
+    deletePermanentMutation.mutate(purchase.id)
   }
 
   return (
@@ -124,7 +148,13 @@ export default function InputPurchasesPage() {
       >
         <div className="space-y-4">
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
-          <InputPurchasesTable purchases={purchases} cancelingId={cancelingId} onCancel={handleCancel} />
+          <InputPurchasesTable
+            purchases={purchases}
+            cancelingId={cancelingId}
+            deletingPermanentId={deletingPermanentId}
+            onCancel={handleCancel}
+            onDeletePermanent={handleDeletePermanent}
+          />
         </div>
       </ListPage>
 

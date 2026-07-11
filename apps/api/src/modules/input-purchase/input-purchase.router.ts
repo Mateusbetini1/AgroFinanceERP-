@@ -68,6 +68,17 @@ inputPurchaseRouter.patch(
   }),
 )
 
+// DELETE /api/v1/input-purchases/:id/permanent
+inputPurchaseRouter.delete(
+  '/:id/permanent',
+  inputPurchaseWriteAccess,
+  validate(inputPurchaseParamsSchema, 'params'),
+  asyncHandler(async (req, res) => {
+    await InputPurchaseService.deletePermanent(req.company!.id, req.params.id, req)
+    res.status(204).send()
+  }),
+)
+
 // GET /api/v1/input-purchases/:id
 inputPurchaseRouter.get(
   '/:id',

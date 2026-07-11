@@ -58,3 +58,7 @@ export async function cancelInputPurchase(id: string, payload: CancelInputPurcha
   })
   return data.data
 }
+
+export async function deleteInputPurchasePermanent(id: string) {
+  await api.delete(`/input-purchases/${id}/permanent`)
+}
