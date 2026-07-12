@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { dateInputToIso, formatCurrency, formatDecimal, formatUnit, toDateInputValue } from '@/lib/utils'
+import { dateInputToIso, formatCurrency, formatQuantity, formatUnit, toDateInputValue } from '@/lib/utils'
 import type { FarmLocation, InputStockBalance, Safra, Supply, SupplyUnit } from '@/types/api'
 import type { InputApplicationPayload } from '../api'
 
@@ -139,7 +139,7 @@ export function InputApplicationForm({
           </Select>
           {selectedSupply && (
             <p className="text-xs text-muted-foreground">
-              Saldo: {formatDecimal(selectedBalance?.quantityBase ?? 0, 3)} {formatUnit(selectedSupply.baseUnit)}
+              Saldo: {formatQuantity(selectedBalance?.quantityBase ?? 0)} {formatUnit(selectedSupply.baseUnit)}
             </p>
           )}
           {selectedSupply && Number(selectedBalance?.quantityBase ?? 0) <= 0 && (
@@ -235,7 +235,7 @@ export function InputApplicationForm({
         <p className="mt-1 text-lg font-semibold">{estimated ? formatCurrency(estimated.totalCost) : '-'}</p>
         {estimated && selectedSupply && (
           <p className="mt-1 text-xs text-muted-foreground">
-            {formatDecimal(estimated.quantityBase, 3)} {formatUnit(selectedSupply.baseUnit)} x{' '}
+            {formatQuantity(estimated.quantityBase)} {formatUnit(selectedSupply.baseUnit)} x{' '}
             {formatCurrency(selectedBalance?.averageCostBase ?? 0)}
           </p>
         )}

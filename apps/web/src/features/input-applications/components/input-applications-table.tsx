@@ -1,5 +1,5 @@
 import { DataTable, type DataTableColumn } from '@/components/data/data-table'
-import { formatCurrency, formatDate, formatDecimal, formatUnit } from '@/lib/utils'
+import { formatCurrency, formatDate, formatQuantity, formatUnit } from '@/lib/utils'
 import type { InputApplication } from '@/types/api'
 
 function firstAllocation(application: InputApplication) {
@@ -13,7 +13,7 @@ export function InputApplicationsTable({ applications }: { applications: InputAp
     {
       header: 'Quantidade',
       cell: (application) =>
-        `${formatDecimal(application.quantityBase, 3)} ${formatUnit(application.supply.baseUnit)}`,
+        `${formatQuantity(application.quantityBase)} ${formatUnit(application.supply.baseUnit)}`,
       className: 'text-right',
     },
     { header: 'Safra', cell: (application) => firstAllocation(application)?.safra.name ?? '-' },
@@ -39,7 +39,7 @@ export function InputApplicationsTable({ applications }: { applications: InputAp
           <div>
             <p className="break-words text-sm font-semibold text-foreground">{application.supply.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {formatDecimal(application.quantityBase, 3)} {formatUnit(application.supply.baseUnit)}
+              {formatQuantity(application.quantityBase)} {formatUnit(application.supply.baseUnit)}
             </p>
           </div>
           <div>
