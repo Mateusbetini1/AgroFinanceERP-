@@ -1,12 +1,12 @@
 import { DataTable, type DataTableColumn } from '@/components/data/data-table'
-import { formatCurrency, formatDate, formatDecimal, formatSupplyCategory, formatUnit } from '@/lib/utils'
+import { formatCurrency, formatDate, formatQuantity, formatSupplyCategory, formatUnit } from '@/lib/utils'
 import type { InputStockBalance } from '@/types/api'
 
 export function InputStockTable({ balances }: { balances: InputStockBalance[] }) {
   const columns: DataTableColumn<InputStockBalance>[] = [
     { header: 'Insumo', cell: (balance) => <span className="font-medium">{balance.supply.name}</span> },
     { header: 'Categoria', cell: (balance) => formatSupplyCategory(balance.supply.category) },
-    { header: 'Saldo', cell: (balance) => formatDecimal(balance.quantityBase, 3), className: 'text-right' },
+    { header: 'Saldo', cell: (balance) => formatQuantity(balance.quantityBase), className: 'text-right' },
     { header: 'Unidade base', cell: (balance) => formatUnit(balance.supply.baseUnit) },
     { header: 'Custo médio', cell: (balance) => formatCurrency(balance.averageCostBase), className: 'text-right' },
     { header: 'Valor em estoque', cell: (balance) => formatCurrency(balance.totalValue), className: 'text-right' },
@@ -29,7 +29,7 @@ export function InputStockTable({ balances }: { balances: InputStockBalance[] })
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Saldo</p>
               <p className="mt-1 font-semibold">
-                {formatDecimal(balance.quantityBase, 3)} {formatUnit(balance.supply.baseUnit)}
+                {formatQuantity(balance.quantityBase)} {formatUnit(balance.supply.baseUnit)}
               </p>
             </div>
             <div>

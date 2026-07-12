@@ -3,9 +3,9 @@ import { DataTable, type DataTableColumn } from '@/components/data/data-table'
 import {
   formatCurrency,
   formatDate,
-  formatDecimal,
   formatInputStockMovementDirection,
   formatInputStockMovementType,
+  formatQuantity,
   formatUnit,
 } from '@/lib/utils'
 import type { InputStockMovement } from '@/types/api'
@@ -25,14 +25,14 @@ export function InputStockMovementsTable({ movements }: { movements: InputStockM
     },
     {
       header: 'Quantidade',
-      cell: (movement) => `${formatDecimal(movement.quantityBase, 3)} ${formatUnit(movement.supply.baseUnit)}`,
+      cell: (movement) => `${formatQuantity(movement.quantityBase)} ${formatUnit(movement.supply.baseUnit)}`,
       className: 'text-right',
     },
     { header: 'Custo unitário', cell: (movement) => formatCurrency(movement.unitCostBase), className: 'text-right' },
     { header: 'Total', cell: (movement) => formatCurrency(movement.totalCost), className: 'text-right' },
     {
       header: 'Saldo após',
-      cell: (movement) => `${formatDecimal(movement.balanceQuantityAfter, 3)} ${formatUnit(movement.supply.baseUnit)}`,
+      cell: (movement) => `${formatQuantity(movement.balanceQuantityAfter)} ${formatUnit(movement.supply.baseUnit)}`,
       className: 'text-right',
     },
   ]
