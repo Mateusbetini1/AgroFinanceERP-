@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, ListChecks, Plus } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
@@ -57,8 +57,9 @@ function cleanFilters(filters: BillFilterState) {
 export default function BillsPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<BillFilterState>(initialFilters)
+  const [searchInput, setSearchInput] = useState(initialFilters.search)
   const apiFilters = cleanFilters(filters)
-  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
   const query = useQuery({ queryKey: ['bills', apiFilters], queryFn: () => listBills(apiFilters) })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
@@ -75,6 +76,14 @@ export default function BillsPage() {
   const [editing, setEditing] = useState<Bill | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
+    }, 400)
+
+    return () => window.clearTimeout(timeout)
+  }, [searchInput])
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['bills'] })
@@ -151,6 +160,11 @@ export default function BillsPage() {
     else createMutation.mutate(submission.payload)
   }
 
+  function clearFilters() {
+    setSearchInput(initialFilters.search)
+    setFilters(initialFilters)
+  }
+
   const isAuxLoading = suppliersQuery.isLoading || accountsQuery.isLoading || categoriesQuery.isLoading || safrasQuery.isLoading
   const hasAuxError = suppliersQuery.isError || accountsQuery.isError || categoriesQuery.isError || safrasQuery.isError
 
@@ -181,14 +195,14 @@ export default function BillsPage() {
         }
       >
         <div className="space-y-4">
-          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+          <ListFilters onClear={clearFilters} hasActiveFilters={hasActiveFilters}>
             <div className="space-y-1">
               <Label htmlFor="bill-search">Busca</Label>
               <Input
                 id="bill-search"
-                value={filters.search}
+                value={searchInput}
                 placeholder="Descricao ou fornecedor"
-                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </div>
             <div className="space-y-1">

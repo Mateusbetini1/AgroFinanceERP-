@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
@@ -47,8 +47,9 @@ const initialFilters: RevenueFilterState = { search: '', status: '', safraId: ''
 export default function RevenuesPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<RevenueFilterState>(initialFilters)
+  const [searchInput, setSearchInput] = useState(initialFilters.search)
   const apiFilters = cleanFilters(filters)
-  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
   const query = useQuery({ queryKey: ['revenues', apiFilters], queryFn: () => listRevenues(apiFilters) })
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
@@ -63,6 +64,14 @@ export default function RevenuesPage() {
   const [editing, setEditing] = useState<Revenue | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
+    }, 400)
+
+    return () => window.clearTimeout(timeout)
+  }, [searchInput])
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['revenues'] })
@@ -124,6 +133,11 @@ export default function RevenuesPage() {
     else createMutation.mutate(payload)
   }
 
+  function clearFilters() {
+    setSearchInput(initialFilters.search)
+    setFilters(initialFilters)
+  }
+
   const isAuxLoading = productsQuery.isLoading || accountsQuery.isLoading || safrasQuery.isLoading
 
   return (
@@ -140,14 +154,14 @@ export default function RevenuesPage() {
         onNew={openCreate}
       >
         <div className="space-y-4">
-          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+          <ListFilters onClear={clearFilters} hasActiveFilters={hasActiveFilters}>
             <div className="space-y-1">
               <Label htmlFor="revenue-search">Busca</Label>
               <Input
                 id="revenue-search"
-                value={filters.search}
+                value={searchInput}
                 placeholder="Cliente ou produto"
-                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </div>
             <div className="space-y-1">

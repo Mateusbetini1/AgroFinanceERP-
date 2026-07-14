@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
@@ -48,8 +48,9 @@ function cleanFilters(filters: ExpenseFilterState) {
 export default function ExpensesPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<ExpenseFilterState>(initialFilters)
+  const [searchInput, setSearchInput] = useState(initialFilters.search)
   const apiFilters = cleanFilters(filters)
-  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
   const query = useQuery({ queryKey: ['expenses', apiFilters], queryFn: () => listExpenses(apiFilters) })
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
@@ -66,6 +67,14 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
+    }, 400)
+
+    return () => window.clearTimeout(timeout)
+  }, [searchInput])
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['expenses'] })
@@ -127,6 +136,11 @@ export default function ExpensesPage() {
     else createMutation.mutate(payload)
   }
 
+  function clearFilters() {
+    setSearchInput(initialFilters.search)
+    setFilters(initialFilters)
+  }
+
   const isAuxLoading =
     categoriesQuery.isLoading || suppliersQuery.isLoading || accountsQuery.isLoading || safrasQuery.isLoading
   const hasAuxError = categoriesQuery.isError || suppliersQuery.isError || accountsQuery.isError || safrasQuery.isError
@@ -145,14 +159,14 @@ export default function ExpensesPage() {
         onNew={openCreate}
       >
         <div className="space-y-4">
-          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+          <ListFilters onClear={clearFilters} hasActiveFilters={hasActiveFilters}>
             <div className="space-y-1">
               <Label htmlFor="expense-search">Busca</Label>
               <Input
                 id="expense-search"
-                value={filters.search}
+                value={searchInput}
                 placeholder="Descricao, fornecedor ou categoria"
-                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </div>
             <div className="space-y-1">
