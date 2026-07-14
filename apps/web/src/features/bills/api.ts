@@ -16,6 +16,14 @@ export interface BillPayload {
   installmentCount?: number | null
 }
 
+export interface BillFilters {
+  search?: string
+  status?: BillStatus
+  safraId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
 export interface BillInstallmentsPayload {
   categoryId?: string
   supplierId?: string
@@ -147,8 +155,8 @@ function cleanCreateBillRecurringPayload(payload: BillRecurringPayload): BillRec
   return clean
 }
 
-export async function listBills() {
-  const { data } = await api.get<PaginatedResponse<Bill>>('/bills')
+export async function listBills(filters?: BillFilters) {
+  const { data } = await api.get<PaginatedResponse<Bill>>('/bills', { params: filters })
   return data
 }
 

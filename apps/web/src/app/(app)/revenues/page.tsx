@@ -4,7 +4,11 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
+import { ListFilters } from '@/components/data/list-filters'
 import { ListPage } from '@/components/data/list-page'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { listAccounts } from '@/features/accounts/api'
 import { listProducts } from '@/features/products/api'
 import { createRevenue, deleteRevenue, listRevenues, updateRevenue, type RevenuePayload } from '@/features/revenues/api'
@@ -14,9 +18,38 @@ import { listSafras } from '@/features/safras/api'
 import { getApiErrorMessage } from '@/lib/utils'
 import type { Revenue } from '@/types/api'
 
+type RevenueFilterState = {
+  search: string
+  status: '' | 'PENDING' | 'RECEIVED'
+  safraId: string
+  month: string
+}
+
+function monthBounds(month: string) {
+  if (!month) return {}
+  const [year, monthNumber] = month.split('-').map(Number)
+  const start = new Date(year, monthNumber - 1, 1, 12)
+  const end = new Date(year, monthNumber, 0, 12)
+  return { dateFrom: start.toISOString(), dateTo: end.toISOString() }
+}
+
+function cleanFilters(filters: RevenueFilterState) {
+  return {
+    ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.safraId ? { safraId: filters.safraId } : {}),
+    ...monthBounds(filters.month),
+  }
+}
+
+const initialFilters: RevenueFilterState = { search: '', status: '', safraId: '', month: '' }
+
 export default function RevenuesPage() {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['revenues'], queryFn: listRevenues })
+  const [filters, setFilters] = useState<RevenueFilterState>(initialFilters)
+  const apiFilters = cleanFilters(filters)
+  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const query = useQuery({ queryKey: ['revenues', apiFilters], queryFn: () => listRevenues(apiFilters) })
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
   const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
@@ -100,20 +133,73 @@ export default function RevenuesPage() {
         description="Vendas e recebimentos cadastrados por produto."
         isLoading={query.isLoading}
         isError={query.isError}
-        isEmpty={revenues.length === 0}
+        isEmpty={false}
         emptyMessage="Nenhuma receita encontrada."
         errorMessage="Não foi possível carregar as receitas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
         <div className="space-y-4">
+          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+            <div className="space-y-1">
+              <Label htmlFor="revenue-search">Busca</Label>
+              <Input
+                id="revenue-search"
+                value={filters.search}
+                placeholder="Cliente ou produto"
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="revenue-status">Status</Label>
+              <Select
+                id="revenue-status"
+                value={filters.status}
+                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as RevenueFilterState['status'] }))}
+              >
+                <option value="">Todos</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="RECEIVED">Recebidos</option>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="revenue-safra">Safra</Label>
+              <Select
+                id="revenue-safra"
+                value={filters.safraId}
+                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+              >
+                <option value="">Todas</option>
+                {safras.map((safra) => (
+                  <option key={safra.id} value={safra.id}>
+                    {safra.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="revenue-month">Mes</Label>
+              <Input
+                id="revenue-month"
+                type="month"
+                value={filters.month}
+                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+              />
+            </div>
+          </ListFilters>
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
           {(productsQuery.isError || accountsQuery.isError || safrasQuery.isError) && (
             <InlineAlert>
               Não foi possível carregar todos os campos de apoio do formulário. Tente novamente antes de cadastrar.
             </InlineAlert>
           )}
-          <RevenuesTable revenues={revenues} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          {revenues.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">
+              {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhuma receita encontrada.'}
+            </div>
+          ) : (
+            <RevenuesTable revenues={revenues} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          )}
         </div>
       </ListPage>
 

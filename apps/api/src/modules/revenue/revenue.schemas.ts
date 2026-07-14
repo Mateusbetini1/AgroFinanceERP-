@@ -44,6 +44,7 @@ export const listRevenuesSchema = paginationSchema.extend({
   search: z.string().trim().optional(),
   status: z.enum(['PENDING', 'RECEIVED']).optional(),
   productId: uuidSchema.optional(),
+  safraId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),

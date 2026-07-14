@@ -14,6 +14,14 @@ export interface RevenuePayload {
   status?: RevenueStatus
 }
 
+export interface RevenueFilters {
+  search?: string
+  status?: RevenueStatus
+  safraId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
 function cleanCreateRevenuePayload(payload: RevenuePayload): RevenuePayload {
   const clean: RevenuePayload = {
     productId: payload.productId,
@@ -51,8 +59,8 @@ function cleanUpdateRevenuePayload(payload: RevenuePayload): RevenuePayload {
   return clean
 }
 
-export async function listRevenues() {
-  const { data } = await api.get<PaginatedResponse<Revenue>>('/revenues')
+export async function listRevenues(filters?: RevenueFilters) {
+  const { data } = await api.get<PaginatedResponse<Revenue>>('/revenues', { params: filters })
   return data
 }
 

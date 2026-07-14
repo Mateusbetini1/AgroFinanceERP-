@@ -6,7 +6,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, ListChecks, Plus } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
+import { ListFilters } from '@/components/data/list-filters'
 import { ListPage } from '@/components/data/list-page'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { listAccounts } from '@/features/accounts/api'
 import { listCategories } from '@/features/categories/api'
 import {
@@ -24,9 +28,38 @@ import { listSafras } from '@/features/safras/api'
 import { cn, getApiErrorMessage } from '@/lib/utils'
 import type { Bill } from '@/types/api'
 
+type BillFilterState = {
+  search: string
+  status: '' | 'PENDING' | 'PAID' | 'OVERDUE'
+  safraId: string
+  month: string
+}
+
+const initialFilters: BillFilterState = { search: '', status: '', safraId: '', month: '' }
+
+function monthBounds(month: string) {
+  if (!month) return {}
+  const [year, monthNumber] = month.split('-').map(Number)
+  const start = new Date(year, monthNumber - 1, 1, 12)
+  const end = new Date(year, monthNumber, 0, 12)
+  return { dateFrom: start.toISOString(), dateTo: end.toISOString() }
+}
+
+function cleanFilters(filters: BillFilterState) {
+  return {
+    ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.safraId ? { safraId: filters.safraId } : {}),
+    ...monthBounds(filters.month),
+  }
+}
+
 export default function BillsPage() {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['bills'], queryFn: listBills })
+  const [filters, setFilters] = useState<BillFilterState>(initialFilters)
+  const apiFilters = cleanFilters(filters)
+  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const query = useQuery({ queryKey: ['bills', apiFilters], queryFn: () => listBills(apiFilters) })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
@@ -129,7 +162,7 @@ export default function BillsPage() {
         description="Contas individuais a pagar, pendentes, pagas ou vencidas."
         isLoading={query.isLoading}
         isError={query.isError}
-        isEmpty={bills.length === 0}
+        isEmpty={false}
         emptyMessage="Nenhum boleto encontrado."
         errorMessage="Não foi possível carregar os boletos."
         onRetry={() => void query.refetch()}
@@ -148,6 +181,55 @@ export default function BillsPage() {
         }
       >
         <div className="space-y-4">
+          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+            <div className="space-y-1">
+              <Label htmlFor="bill-search">Busca</Label>
+              <Input
+                id="bill-search"
+                value={filters.search}
+                placeholder="Descricao ou fornecedor"
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="bill-status">Status</Label>
+              <Select
+                id="bill-status"
+                value={filters.status}
+                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as BillFilterState['status'] }))}
+              >
+                <option value="">Todos</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="PAID">Pagos</option>
+                <option value="OVERDUE">Vencidos</option>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="bill-safra">Safra</Label>
+              <Select
+                id="bill-safra"
+                value={filters.safraId}
+                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+              >
+                <option value="">Todas</option>
+                {safras.map((safra) => (
+                  <option key={safra.id} value={safra.id}>
+                    {safra.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="bill-month">Mes de vencimento</Label>
+              <Input
+                id="bill-month"
+                type="month"
+                value={filters.month}
+                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+              />
+            </div>
+          </ListFilters>
+
           <div className="grid gap-2 md:hidden">
             <button
               type="button"
@@ -187,7 +269,13 @@ export default function BillsPage() {
               Não foi possível carregar todos os campos de apoio do formulário. Tente novamente antes de cadastrar.
             </InlineAlert>
           )}
-          <BillsTable bills={bills} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          {bills.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">
+              {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhum boleto encontrado.'}
+            </div>
+          ) : (
+            <BillsTable bills={bills} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          )}
         </div>
         </ListPage>
       </div>

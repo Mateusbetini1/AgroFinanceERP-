@@ -4,7 +4,11 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
+import { ListFilters } from '@/components/data/list-filters'
 import { ListPage } from '@/components/data/list-page'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { listAccounts } from '@/features/accounts/api'
 import { listCategories } from '@/features/categories/api'
 import { createExpense, deleteExpense, listExpenses, updateExpense, type ExpensePayload } from '@/features/expenses/api'
@@ -15,9 +19,38 @@ import { listSuppliers } from '@/features/suppliers/api'
 import { getApiErrorMessage } from '@/lib/utils'
 import type { Expense } from '@/types/api'
 
+type ExpenseFilterState = {
+  search: string
+  status: '' | 'PENDING' | 'PAID' | 'OVERDUE'
+  safraId: string
+  month: string
+}
+
+const initialFilters: ExpenseFilterState = { search: '', status: '', safraId: '', month: '' }
+
+function monthBounds(month: string) {
+  if (!month) return {}
+  const [year, monthNumber] = month.split('-').map(Number)
+  const start = new Date(year, monthNumber - 1, 1, 12)
+  const end = new Date(year, monthNumber, 0, 12)
+  return { dateFrom: start.toISOString(), dateTo: end.toISOString() }
+}
+
+function cleanFilters(filters: ExpenseFilterState) {
+  return {
+    ...(filters.search.trim() ? { search: filters.search.trim() } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.safraId ? { safraId: filters.safraId } : {}),
+    ...monthBounds(filters.month),
+  }
+}
+
 export default function ExpensesPage() {
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['expenses'], queryFn: listExpenses })
+  const [filters, setFilters] = useState<ExpenseFilterState>(initialFilters)
+  const apiFilters = cleanFilters(filters)
+  const hasActiveFilters = Object.keys(apiFilters).length > 0
+  const query = useQuery({ queryKey: ['expenses', apiFilters], queryFn: () => listExpenses(apiFilters) })
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
@@ -66,7 +99,7 @@ export default function ExpensesPage() {
     onMutate: (id) => setDeletingId(id),
     onSuccess: async () => {
       await invalidate()
-      setFeedback({ type: 'success', message: 'Despesa excluída com sucesso.' })
+      setFeedback({ type: 'success', message: 'Despesa excluida com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
     onSettled: () => setDeletingId(null),
@@ -102,30 +135,85 @@ export default function ExpensesPage() {
     <>
       <ListPage
         title="Despesas"
-        description="Despesas operacionais e financeiras lançadas."
+        description="Despesas operacionais e financeiras lancadas."
         isLoading={query.isLoading}
         isError={query.isError}
-        isEmpty={expenses.length === 0}
+        isEmpty={false}
         emptyMessage="Nenhuma despesa encontrada."
-        errorMessage="Não foi possível carregar as despesas."
+        errorMessage="Nao foi possivel carregar as despesas."
         onRetry={() => void query.refetch()}
         onNew={openCreate}
       >
         <div className="space-y-4">
+          <ListFilters onClear={() => setFilters(initialFilters)} hasActiveFilters={hasActiveFilters}>
+            <div className="space-y-1">
+              <Label htmlFor="expense-search">Busca</Label>
+              <Input
+                id="expense-search"
+                value={filters.search}
+                placeholder="Descricao, fornecedor ou categoria"
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="expense-status">Status</Label>
+              <Select
+                id="expense-status"
+                value={filters.status}
+                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ExpenseFilterState['status'] }))}
+              >
+                <option value="">Todos</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="PAID">Pagas</option>
+                <option value="OVERDUE">Vencidas</option>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="expense-safra">Safra</Label>
+              <Select
+                id="expense-safra"
+                value={filters.safraId}
+                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+              >
+                <option value="">Todas</option>
+                {safras.map((safra) => (
+                  <option key={safra.id} value={safra.id}>
+                    {safra.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="expense-month">Mes</Label>
+              <Input
+                id="expense-month"
+                type="month"
+                value={filters.month}
+                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+              />
+            </div>
+          </ListFilters>
+
           {feedback && <InlineAlert tone={feedback.type}>{feedback.message}</InlineAlert>}
           {hasAuxError && (
             <InlineAlert>
-              Não foi possível carregar todos os campos de apoio do formulário. Tente novamente antes de cadastrar.
+              Nao foi possivel carregar todos os campos de apoio do formulario. Tente novamente antes de cadastrar.
             </InlineAlert>
           )}
-          <ExpensesTable expenses={expenses} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          {expenses.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">
+              {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhuma despesa encontrada.'}
+            </div>
+          ) : (
+            <ExpensesTable expenses={expenses} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+          )}
         </div>
       </ListPage>
 
       <Dialog
         open={dialogOpen}
         title={editing ? 'Editar despesa' : 'Nova despesa'}
-        description="Preencha os dados do lançamento de despesa."
+        description="Preencha os dados do lancamento de despesa."
         onClose={() => setDialogOpen(false)}
       >
         {feedback?.type === 'error' && <InlineAlert>{feedback.message}</InlineAlert>}

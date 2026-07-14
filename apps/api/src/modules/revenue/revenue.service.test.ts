@@ -173,3 +173,48 @@ describe('RevenueService balance rules', () => {
     expect(prismaMock.account.update).not.toHaveBeenCalled()
   })
 })
+
+describe('RevenueService list filters', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+    prismaMock.revenue.findMany.mockResolvedValue([])
+    prismaMock.revenue.count.mockResolvedValue(0)
+  })
+
+  it('filtra por status, safra e busca em cliente ou produto sem alterar saldo', async () => {
+    await RevenueService.list(companyId, {
+      page: 1,
+      limit: 20,
+      status: 'PENDING',
+      safraId: 'safra-1',
+      search: 'pimentao',
+    })
+
+    const where = prismaMock.revenue.findMany.mock.calls[0][0].where
+    expect(where).toEqual(
+      expect.objectContaining({
+        companyId,
+        deletedAt: null,
+        status: 'PENDING',
+        safraId: 'safra-1',
+        OR: [
+          { client: { contains: 'pimentao', mode: 'insensitive' } },
+          { product: { name: { contains: 'pimentao', mode: 'insensitive' } } },
+        ],
+      }),
+    )
+    expect(prismaMock.revenue.count).toHaveBeenCalledWith({ where })
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.revenue.update).not.toHaveBeenCalled()
+  })
+
+  it('filtros vazios mantem comportamento atual e nao mistura empresas', async () => {
+    await RevenueService.list(companyId, { page: 1, limit: 20 })
+
+    expect(prismaMock.revenue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, deletedAt: null },
+      }),
+    )
+  })
+})

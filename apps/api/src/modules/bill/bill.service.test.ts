@@ -492,6 +492,51 @@ describe('BillService installment rules', () => {
   })
 })
 
+describe('BillService list filters', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.bill.count.mockResolvedValue(0)
+  })
+
+  it('filtra por status, safra e busca em descricao ou fornecedor sem alterar saldo', async () => {
+    await BillService.list(companyId, {
+      page: 1,
+      limit: 20,
+      status: 'PENDING',
+      safraId: 'safra-1',
+      search: 'fornecedor',
+    })
+
+    const where = prismaMock.bill.findMany.mock.calls[0][0].where
+    expect(where).toEqual(
+      expect.objectContaining({
+        companyId,
+        deletedAt: null,
+        status: 'PENDING',
+        safraId: 'safra-1',
+        OR: [
+          { description: { contains: 'fornecedor', mode: 'insensitive' } },
+          { supplier: { name: { contains: 'fornecedor', mode: 'insensitive' } } },
+        ],
+      }),
+    )
+    expect(prismaMock.bill.count).toHaveBeenCalledWith({ where })
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.bill.update).not.toHaveBeenCalled()
+  })
+
+  it('filtros vazios mantem comportamento atual e nao mistura empresas', async () => {
+    await BillService.list(companyId, { page: 1, limit: 20 })
+
+    expect(prismaMock.bill.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, deletedAt: null },
+      }),
+    )
+  })
+})
+
 describe('BillService bill group read model', () => {
   beforeEach(() => {
     resetPrismaMock()

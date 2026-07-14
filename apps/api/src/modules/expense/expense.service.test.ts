@@ -174,3 +174,49 @@ describe('ExpenseService balance rules', () => {
     expect(prismaMock.account.update).not.toHaveBeenCalled()
   })
 })
+
+describe('ExpenseService list filters', () => {
+  beforeEach(() => {
+    resetPrismaMock()
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.expense.count.mockResolvedValue(0)
+  })
+
+  it('filtra por status, safra e busca em descricao, fornecedor ou categoria sem alterar saldo', async () => {
+    await ExpenseService.list(companyId, {
+      page: 1,
+      limit: 20,
+      status: 'OVERDUE',
+      safraId: 'safra-1',
+      search: 'energia',
+    })
+
+    const where = prismaMock.expense.findMany.mock.calls[0][0].where
+    expect(where).toEqual(
+      expect.objectContaining({
+        companyId,
+        deletedAt: null,
+        status: 'OVERDUE',
+        safraId: 'safra-1',
+        OR: [
+          { description: { contains: 'energia', mode: 'insensitive' } },
+          { supplier: { name: { contains: 'energia', mode: 'insensitive' } } },
+          { category: { name: { contains: 'energia', mode: 'insensitive' } } },
+        ],
+      }),
+    )
+    expect(prismaMock.expense.count).toHaveBeenCalledWith({ where })
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.expense.update).not.toHaveBeenCalled()
+  })
+
+  it('filtros vazios mantem comportamento atual e nao mistura empresas', async () => {
+    await ExpenseService.list(companyId, { page: 1, limit: 20 })
+
+    expect(prismaMock.expense.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, deletedAt: null },
+      }),
+    )
+  })
+})

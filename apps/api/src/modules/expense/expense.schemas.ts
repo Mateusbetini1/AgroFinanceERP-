@@ -50,6 +50,7 @@ export const listExpensesSchema = paginationSchema.extend({
   status: z.enum(['PENDING', 'PAID', 'OVERDUE']).optional(),
   categoryId: uuidSchema.optional(),
   supplierId: uuidSchema.optional(),
+  safraId: uuidSchema.optional(),
   accountId: uuidSchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),

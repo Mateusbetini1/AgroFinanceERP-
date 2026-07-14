@@ -295,7 +295,7 @@ export const BillService = {
       query
     const { skip, take } = getPaginationArgs({ page, limit })
 
-    const where = {
+    const where: Prisma.BillWhereInput = {
       companyId,
       deletedAt: null,
       ...(status ? { status } : {}),
@@ -305,7 +305,12 @@ export const BillService = {
       ...(categoryId ? { categoryId } : {}),
       ...(safraId ? { safraId } : {}),
       ...(search
-        ? { description: { contains: search, mode: 'insensitive' as const } }
+        ? {
+            OR: [
+              { description: { contains: search, mode: 'insensitive' as const } },
+              { supplier: { name: { contains: search, mode: 'insensitive' as const } } },
+            ],
+          }
         : {}),
       ...(dateFrom || dateTo
         ? {

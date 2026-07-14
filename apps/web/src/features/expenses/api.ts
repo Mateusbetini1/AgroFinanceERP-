@@ -15,6 +15,14 @@ export interface ExpensePayload {
   attachmentUrl?: string | null
 }
 
+export interface ExpenseFilters {
+  search?: string
+  status?: ExpenseStatus
+  safraId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
 function cleanCreateExpensePayload(payload: ExpensePayload): ExpensePayload {
   const clean: ExpensePayload = {
     categoryId: payload.categoryId,
@@ -60,8 +68,8 @@ function cleanUpdateExpensePayload(payload: ExpensePayload): ExpensePayload {
   return clean
 }
 
-export async function listExpenses() {
-  const { data } = await api.get<PaginatedResponse<Expense>>('/expenses')
+export async function listExpenses(filters?: ExpenseFilters) {
+  const { data } = await api.get<PaginatedResponse<Expense>>('/expenses', { params: filters })
   return data
 }
 

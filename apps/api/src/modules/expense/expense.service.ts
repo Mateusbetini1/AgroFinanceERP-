@@ -127,19 +127,26 @@ async function applyExpenseBalanceAdjustment(
 
 export const ExpenseService = {
   async list(companyId: string, query: ListExpensesQuery) {
-    const { page, limit, search, status, categoryId, supplierId, accountId, dateFrom, dateTo } =
+    const { page, limit, search, status, categoryId, supplierId, safraId, accountId, dateFrom, dateTo } =
       query
     const { skip, take } = getPaginationArgs({ page, limit })
 
-    const where = {
+    const where: Prisma.ExpenseWhereInput = {
       companyId,
       deletedAt: null,
       ...(status ? { status } : {}),
       ...(categoryId ? { categoryId } : {}),
       ...(supplierId ? { supplierId } : {}),
+      ...(safraId ? { safraId } : {}),
       ...(accountId ? { accountId } : {}),
       ...(search
-        ? { description: { contains: search, mode: 'insensitive' as const } }
+        ? {
+            OR: [
+              { description: { contains: search, mode: 'insensitive' as const } },
+              { supplier: { name: { contains: search, mode: 'insensitive' as const } } },
+              { category: { name: { contains: search, mode: 'insensitive' as const } } },
+            ],
+          }
         : {}),
       ...(dateFrom || dateTo
         ? {

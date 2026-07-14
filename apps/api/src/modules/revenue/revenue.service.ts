@@ -112,16 +112,24 @@ async function applyBalanceAdjustment(
 
 export const RevenueService = {
   async list(companyId: string, query: ListRevenuesQuery) {
-    const { page, limit, search, status, productId, accountId, dateFrom, dateTo } = query
+    const { page, limit, search, status, productId, safraId, accountId, dateFrom, dateTo } = query
     const { skip, take } = getPaginationArgs({ page, limit })
 
-    const where = {
+    const where: Prisma.RevenueWhereInput = {
       companyId,
       deletedAt: null,
       ...(status ? { status } : {}),
       ...(productId ? { productId } : {}),
+      ...(safraId ? { safraId } : {}),
       ...(accountId ? { accountId } : {}),
-      ...(search ? { client: { contains: search, mode: 'insensitive' as const } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { client: { contains: search, mode: 'insensitive' as const } },
+              { product: { name: { contains: search, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
       ...(dateFrom || dateTo
         ? {
             date: {

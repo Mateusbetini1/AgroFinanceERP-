@@ -91,6 +91,17 @@ function itemTypeLabel(type: OperationalSummaryItem['type']) {
   return labels[type]
 }
 
+function itemRoute(type: OperationalSummaryItem['type']) {
+  const routes = {
+    REVENUE: '/revenues',
+    EXPENSE: '/expenses',
+    BILL: '/bills',
+    PAYROLL: '/employee-payments',
+  }
+
+  return routes[type]
+}
+
 function EventLine({ label, item }: { label: string; item: OperationalSummaryItem | null }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
@@ -194,7 +205,11 @@ function PendingList({
         ) : (
           <div className="divide-y divide-border">
             {visibleItems.map((item) => (
-              <div key={`${item.type}-${item.id}`} className="grid grid-cols-[1fr_auto] gap-3 py-3">
+              <Link
+                key={`${item.type}-${item.id}`}
+                href={itemRoute(item.type)}
+                className="grid grid-cols-[1fr_auto] gap-3 py-3 transition-colors hover:bg-muted/30"
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className={cn('truncate text-sm font-medium', item.isOverdue && 'text-destructive')}>
@@ -208,7 +223,7 @@ function PendingList({
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold">{formatCurrency(item.amount)}</p>
-              </div>
+              </Link>
             ))}
           </div>
         )}
