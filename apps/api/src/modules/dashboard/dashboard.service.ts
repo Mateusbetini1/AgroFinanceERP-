@@ -139,16 +139,19 @@ function getDefaultPeriod(query: DashboardQuery): { start: Date; end: Date } {
   return { start, end }
 }
 
-function getOperationalPeriod(mode: OperationalSummaryQuery['mode'], now = new Date()) {
+function getOperationalPeriod(query: OperationalSummaryQuery, now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  if (mode === 'next-30-days') {
+  if (query.mode === 'next-30-days') {
     return { start: today, end: addDays(today, 30) }
   }
 
+  const selectedYear = query.year ?? today.getFullYear()
+  const selectedMonth = query.month ?? today.getMonth() + 1
+
   return {
-    start: new Date(today.getFullYear(), today.getMonth(), 1),
-    end: new Date(today.getFullYear(), today.getMonth() + 1, 1),
+    start: new Date(selectedYear, selectedMonth - 1, 1),
+    end: new Date(selectedYear, selectedMonth, 1),
   }
 }
 
@@ -385,8 +388,8 @@ export const DashboardService = {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const tomorrow = addDays(today, 1)
-    const period = getOperationalPeriod(query.mode, now)
-    const boundsUntilEnd = { lt: period.end }
+    const period = getOperationalPeriod(query, now)
+    const bounds = { gte: period.start, lt: period.end }
 
     const [revenues, expenses, bills] = await Promise.all([
       prisma.revenue.findMany({
@@ -394,7 +397,7 @@ export const DashboardService = {
           companyId,
           deletedAt: null,
           status: 'PENDING',
-          OR: [{ receivedAt: boundsUntilEnd }, { receivedAt: null, date: boundsUntilEnd }],
+          OR: [{ receivedAt: bounds }, { receivedAt: null, date: bounds }],
         },
         select: {
           id: true,
@@ -412,7 +415,7 @@ export const DashboardService = {
           companyId,
           deletedAt: null,
           status: { in: ['PENDING', 'OVERDUE'] },
-          OR: [{ dueDate: boundsUntilEnd }, { dueDate: null, date: boundsUntilEnd }],
+          OR: [{ dueDate: bounds }, { dueDate: null, date: bounds }],
         },
         select: {
           id: true,
@@ -430,7 +433,7 @@ export const DashboardService = {
           companyId,
           deletedAt: null,
           status: { in: ['PENDING', 'OVERDUE'] },
-          dueDate: boundsUntilEnd,
+          dueDate: bounds,
         },
         select: {
           id: true,

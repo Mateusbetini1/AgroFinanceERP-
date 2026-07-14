@@ -27,6 +27,8 @@ export const payablesQuerySchema = dashboardQuerySchema.extend({
 
 export const operationalSummaryQuerySchema = z.object({
   mode: z.enum(['current-month', 'next-30-days']).default('current-month'),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
 })
 
 export const monthlyDashboardQuerySchema = z.object({

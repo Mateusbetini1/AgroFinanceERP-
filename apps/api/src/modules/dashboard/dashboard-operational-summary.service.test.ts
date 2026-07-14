@@ -53,7 +53,7 @@ describe('DashboardService.operationalSummary', () => {
     vi.useRealTimers()
   })
 
-  it('monta resumo do mes atual com pendencias, folha restante e eventos ordenados', async () => {
+  it('sem year/month usa o mes atual com pendencias, folha restante e eventos ordenados', async () => {
     prismaMock.revenue.findMany.mockResolvedValue([
       pendingRevenue('revenue-2', new Date(2026, 6, 20), 800, 'Cliente B'),
       pendingRevenue('revenue-1', new Date(2026, 6, 10), 1200, 'Cliente A'),
@@ -97,6 +97,56 @@ describe('DashboardService.operationalSummary', () => {
     expect(result.nextEvents.nextReceivable?.id).toBe('revenue-2')
   })
 
+  it('com year/month usa o mes informado', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([
+      pendingRevenue('revenue-august', new Date(2026, 7, 5), 900, 'Cliente Agosto'),
+    ])
+    prismaMock.expense.findMany.mockResolvedValue([
+      pendingExpense('expense-august', new Date(2026, 7, 12), 400, 'Energia agosto'),
+    ])
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([
+      { id: 'employee-1', name: 'Joao', type: 'MONTHLY', baseSalary: 2500 },
+    ])
+    prismaMock.employeePayment.findMany.mockResolvedValue([
+      {
+        employeeId: 'employee-1',
+        type: 'SALARY',
+        amount: 1500,
+        employee: { id: 'employee-1', name: 'Joao', type: 'MONTHLY', baseSalary: 2500 },
+      },
+    ])
+
+    const result = await DashboardService.operationalSummary(companyId, {
+      mode: 'current-month',
+      month: 8,
+      year: 2026,
+    })
+
+    expect(result.period).toEqual({
+      mode: 'current-month',
+      startDate: new Date(2026, 7, 1),
+      endDate: new Date(2026, 8, 1),
+    })
+    expect(result.summary).toEqual({ totalToReceive: 900, totalToPay: 1400, expectedBalance: -500 })
+    expect(result.payroll).toEqual({ expected: 2500, paid: 1500, remaining: 1000 })
+    expect(prismaMock.revenue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { receivedAt: { gte: new Date(2026, 7, 1), lt: new Date(2026, 8, 1) } },
+            { receivedAt: null, date: { gte: new Date(2026, 7, 1), lt: new Date(2026, 8, 1) } },
+          ],
+        }),
+      }),
+    )
+    expect(prismaMock.employeePayment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ referenceMonth: 8, referenceYear: 2026 }),
+      }),
+    )
+  })
+
   it('usa proximos 30 dias como periodo ate 13/08 e mantem somente itens em aberto nas consultas', async () => {
     prismaMock.revenue.findMany.mockResolvedValue([
       pendingRevenue('revenue-1', new Date(2026, 7, 12), 700, 'Cliente A'),
@@ -130,14 +180,14 @@ describe('DashboardService.operationalSummary', () => {
     )
   })
 
-  it('nao altera saldo, status ou ledger financeiro', async () => {
+  it('mudanca de mes nao altera saldo, status ou ledger financeiro', async () => {
     prismaMock.revenue.findMany.mockResolvedValue([])
     prismaMock.expense.findMany.mockResolvedValue([])
     prismaMock.bill.findMany.mockResolvedValue([])
     prismaMock.employee.findMany.mockResolvedValue([])
     prismaMock.employeePayment.findMany.mockResolvedValue([])
 
-    await DashboardService.operationalSummary(companyId, { mode: 'current-month' })
+    await DashboardService.operationalSummary(companyId, { mode: 'current-month', month: 9, year: 2026 })
 
     expect(prismaMock.account.update).not.toHaveBeenCalled()
     expect(prismaMock.account.aggregate).not.toHaveBeenCalled()

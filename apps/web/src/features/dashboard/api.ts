@@ -25,9 +25,12 @@ export async function getDashboardLive() {
   return data.data
 }
 
-export async function getDashboardOperationalSummary(mode: OperationalSummaryMode) {
+export async function getDashboardOperationalSummary(mode: OperationalSummaryMode, period?: { month: number; year: number }) {
   const { data } = await api.get<ApiResponse<DashboardOperationalSummary>>('/dashboard/operational-summary', {
-    params: { mode },
+    params: {
+      mode,
+      ...(mode === 'current-month' && period ? period : {}),
+    },
   })
   return data.data
 }

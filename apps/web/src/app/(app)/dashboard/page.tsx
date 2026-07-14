@@ -7,6 +7,8 @@ import {
   Banknote,
   CalendarClock,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   PlusCircle,
   RefreshCcw,
@@ -25,7 +27,7 @@ import { cn, formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
 type SummaryTone = 'default' | 'positive' | 'negative' | 'warning'
 
 const modes: Array<{ value: OperationalSummaryMode; label: string }> = [
-  { value: 'current-month', label: 'Mes atual' },
+  { value: 'current-month', label: 'Mes selecionado' },
   { value: 'next-30-days', label: 'Proximos 30 dias' },
 ]
 
@@ -230,24 +232,45 @@ function LoadingState() {
   )
 }
 
+function getMonthTitle(date: Date) {
+  const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date)
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function addMonthsToDate(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1)
+}
+
 export default function DashboardPage() {
+  const now = new Date()
   const [mode, setMode] = useState<OperationalSummaryMode>('current-month')
+  const [selectedMonth, setSelectedMonth] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
   const query = useQuery({
-    queryKey: ['dashboard', 'operational-summary', mode],
-    queryFn: () => getDashboardOperationalSummary(mode),
+    queryKey: ['dashboard', 'operational-summary', mode, selectedMonth.getFullYear(), selectedMonth.getMonth() + 1],
+    queryFn: () =>
+      getDashboardOperationalSummary(mode, {
+        month: selectedMonth.getMonth() + 1,
+        year: selectedMonth.getFullYear(),
+      }),
   })
 
   const balanceTone = (query.data?.summary.expectedBalance ?? 0) >= 0 ? 'positive' : 'negative'
+  const periodLabel =
+    mode === 'current-month'
+      ? getMonthTitle(selectedMonth)
+      : query.data
+        ? `${formatDate(query.data.period.startDate)} a ${formatDate(query.data.period.endDate)}`
+        : 'Hoje a +30 dias'
 
   return (
     <div className="space-y-4 lg:space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-normal text-foreground lg:text-2xl">Painel do mes</h1>
-          <p className="text-sm text-muted-foreground">Recebimentos e pagamentos em aberto, ordenados por data.</p>
+          <p className="text-sm text-muted-foreground">{periodLabel} - recebimentos e pagamentos em aberto.</p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-[190px_auto] sm:items-end">
+        <div className="grid gap-2 sm:grid-cols-[190px_auto_auto] sm:items-center">
           <Select value={mode} onChange={(event) => setMode(event.target.value as OperationalSummaryMode)}>
             {modes.map((item) => (
               <option key={item.value} value={item.value}>
@@ -255,6 +278,29 @@ export default function DashboardPage() {
               </option>
             ))}
           </Select>
+          {mode === 'current-month' && (
+            <div className="grid grid-cols-[40px_1fr_40px] items-center rounded-md border border-input bg-background">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Mes anterior"
+                onClick={() => setSelectedMonth((current) => addMonthsToDate(current, -1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <p className="min-w-[150px] text-center text-sm font-medium">{getMonthTitle(selectedMonth)}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Proximo mes"
+                onClick={() => setSelectedMonth((current) => addMonthsToDate(current, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <Button type="button" variant="outline" onClick={() => void query.refetch()} loading={query.isFetching}>
             <RefreshCcw className="h-4 w-4" />
             Atualizar
