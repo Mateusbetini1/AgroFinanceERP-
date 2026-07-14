@@ -65,9 +65,12 @@ export default function AlertsPage() {
   const deleteMutation = useMutation({
     mutationFn: deleteReminderRule,
     onMutate: (id) => setBusyId(id),
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
+      queryClient.setQueryData<ReminderRule[]>(['notifications', 'reminder-rules'], (current) =>
+        current?.filter((rule) => rule.id !== id) ?? current,
+      )
       await invalidateReminderRules()
-      setFeedback({ type: 'success', message: 'Lembrete desativado com sucesso.' })
+      setFeedback({ type: 'success', message: 'Lembrete excluido com sucesso.' })
     },
     onError: (error) => setFeedback({ type: 'error', message: getApiErrorMessage(error) }),
     onSettled: () => setBusyId(null),
@@ -99,7 +102,7 @@ export default function AlertsPage() {
   }
 
   function handleDelete(rule: ReminderRule) {
-    if (!window.confirm(`Excluir o lembrete "${rule.name}"?`)) return
+    if (!window.confirm('Excluir este lembrete? Ele nao aparecera mais na lista.')) return
     deleteMutation.mutate(rule.id)
   }
 

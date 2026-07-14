@@ -319,13 +319,35 @@ describe('DailyReminderJobService.run', () => {
 
     expect(prismaMock.reminderRule.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ companyId, userId }),
+        where: expect.objectContaining({ companyId, userId, deletedAt: null }),
       }),
     )
     expect(prismaMock.reminderRule.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ companyId: otherCompanyId, userId: otherUserId }),
+        where: expect.objectContaining({ companyId: otherCompanyId, userId: otherUserId, deletedAt: null }),
       }),
     )
+  })
+
+  it('ignora lembretes excluidos no job diario', async () => {
+    prismaMock.pushSubscription.findMany.mockResolvedValue([subscription])
+    mockNoAlerts()
+    prismaMock.reminderRule.findMany.mockResolvedValue([])
+
+    await DailyReminderJobService.run({ referenceDate })
+
+    expect(prismaMock.reminderRule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          companyId,
+          userId,
+          active: true,
+          pushEnabled: true,
+          deletedAt: null,
+        }),
+      }),
+    )
+    expect(webpush.sendNotification).not.toHaveBeenCalled()
+    expect(prismaMock.notificationDelivery.create).not.toHaveBeenCalled()
   })
 })

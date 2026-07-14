@@ -19,6 +19,7 @@ const REMINDER_RULE_SELECT = {
   notes: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 } as const
 
 type RuleShape = {
@@ -137,7 +138,7 @@ function leadDayLabel(days: number) {
 export const ReminderRuleService = {
   async list(companyId: string, userId: string) {
     return prisma.reminderRule.findMany({
-      where: { companyId, userId },
+      where: { companyId, userId, deletedAt: null },
       select: REMINDER_RULE_SELECT,
       orderBy: [{ active: 'desc' }, { name: 'asc' }],
     })
@@ -145,7 +146,7 @@ export const ReminderRuleService = {
 
   async findById(companyId: string, userId: string, id: string) {
     const rule = await prisma.reminderRule.findFirst({
-      where: { id, companyId, userId },
+      where: { id, companyId, userId, deletedAt: null },
       select: REMINDER_RULE_SELECT,
     })
 
@@ -173,19 +174,19 @@ export const ReminderRuleService = {
   async delete(companyId: string, userId: string, id: string) {
     const existing = await ReminderRuleService.findById(companyId, userId, id)
 
-    const updated = await prisma.reminderRule.update({
+    await prisma.reminderRule.update({
       where: { id: existing.id },
-      data: { active: false },
+      data: { deletedAt: new Date() },
       select: REMINDER_RULE_SELECT,
     })
 
-    return updated
+    return { id: existing.id, deleted: true }
   },
 
   async preview(companyId: string, userId: string, referenceDate = new Date()) {
     const today = startOfLocalDay(referenceDate)
     const rules = await prisma.reminderRule.findMany({
-      where: { companyId, userId, active: true },
+      where: { companyId, userId, active: true, deletedAt: null },
       select: REMINDER_RULE_SELECT,
       orderBy: [{ name: 'asc' }],
     })

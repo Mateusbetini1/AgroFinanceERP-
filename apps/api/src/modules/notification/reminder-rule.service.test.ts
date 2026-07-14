@@ -24,6 +24,7 @@ const baseRule = {
   notes: 'Mensalidade',
   createdAt: new Date('2026-07-08T00:00:00.000Z'),
   updatedAt: new Date('2026-07-08T00:00:00.000Z'),
+  deletedAt: null,
 }
 
 describe('ReminderRuleService', () => {
@@ -39,7 +40,7 @@ describe('ReminderRuleService', () => {
     expect(result).toEqual([baseRule])
     expect(prismaMock.reminderRule.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { companyId, userId },
+        where: { companyId, userId, deletedAt: null },
       }),
     )
   })
@@ -171,7 +172,7 @@ describe('ReminderRuleService', () => {
 
     expect(prismaMock.reminderRule.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: ruleId, companyId, userId },
+        where: { id: ruleId, companyId, userId, deletedAt: null },
       }),
     )
     expect(prismaMock.reminderRule.update).toHaveBeenCalledWith(
@@ -192,19 +193,39 @@ describe('ReminderRuleService', () => {
     expect(prismaMock.reminderRule.update).not.toHaveBeenCalled()
   })
 
-  it('desativa regra ao excluir', async () => {
+  it('marca deletedAt ao excluir sem confundir com desativar', async () => {
     prismaMock.reminderRule.findFirst.mockResolvedValue(baseRule)
-    prismaMock.reminderRule.update.mockResolvedValue({ ...baseRule, active: false })
+    prismaMock.reminderRule.update.mockResolvedValue({ ...baseRule, deletedAt: new Date('2026-07-08T12:00:00.000Z') })
 
     const result = await ReminderRuleService.delete(companyId, userId, ruleId)
 
-    expect(result.active).toBe(false)
+    expect(result).toEqual({ id: ruleId, deleted: true })
     expect(prismaMock.reminderRule.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: ruleId },
-        data: { active: false },
+        data: { deletedAt: expect.any(Date) },
       }),
     )
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    expect(prismaMock.revenue.update).not.toHaveBeenCalled()
+    expect(prismaMock.expense.update).not.toHaveBeenCalled()
+    expect(prismaMock.bill.update).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia exclusao de regra de outra empresa ou usuario', async () => {
+    prismaMock.reminderRule.findFirst.mockResolvedValue(null)
+
+    await expect(ReminderRuleService.delete(companyId, userId, ruleId)).rejects.toMatchObject({
+      statusCode: 404,
+    })
+
+    expect(prismaMock.reminderRule.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ruleId, companyId, userId, deletedAt: null },
+      }),
+    )
+    expect(prismaMock.reminderRule.update).not.toHaveBeenCalled()
   })
 
   it('gera preview sem enviar notificacao', async () => {
@@ -229,5 +250,10 @@ describe('ReminderRuleService', () => {
       ]),
     )
     expect(prismaMock.pushSubscription.findMany).not.toHaveBeenCalled()
+    expect(prismaMock.reminderRule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, userId, active: true, deletedAt: null },
+      }),
+    )
   })
 })

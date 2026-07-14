@@ -297,6 +297,7 @@ export const DailyReminderJobService = {
           companyId: target.companyId,
           userId: target.userId,
           active: true,
+          deletedAt: null,
           pushEnabled: true,
         },
         select: {

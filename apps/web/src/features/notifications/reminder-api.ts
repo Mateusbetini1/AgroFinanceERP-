@@ -18,6 +18,7 @@ export type ReminderRule = {
   notes: string | null
   createdAt: string
   updatedAt: string
+  deletedAt?: string | null
 }
 
 export type ReminderRulePayload = {
@@ -83,6 +84,6 @@ export async function updateReminderRule(id: string, payload: Partial<ReminderRu
 }
 
 export async function deleteReminderRule(id: string) {
-  const { data } = await api.delete<ApiResponse<ReminderRule>>(`/notifications/reminder-rules/${id}`)
+  const { data } = await api.delete<ApiResponse<{ id: string; deleted: boolean }>>(`/notifications/reminder-rules/${id}`)
   return data.data
 }

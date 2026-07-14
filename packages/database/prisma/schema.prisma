@@ -412,6 +412,7 @@ model ReminderRule {
   notes          String?
   createdAt      DateTime               @default(now()) @map("created_at")
   updatedAt      DateTime               @updatedAt @map("updated_at")
+  deletedAt      DateTime?              @map("deleted_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -420,6 +421,7 @@ model ReminderRule {
   @@index([companyId, userId])
   @@index([companyId, userId, active])
   @@index([companyId, recurrenceType])
+  @@index([companyId, userId, deletedAt])
   @@map("reminder_rules")
 }
 
