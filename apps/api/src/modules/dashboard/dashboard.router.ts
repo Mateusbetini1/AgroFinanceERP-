@@ -10,11 +10,13 @@ import {
   cashflowQuerySchema,
   forecastQuerySchema,
   monthlyDashboardQuerySchema,
+  operationalSummaryQuerySchema,
   payablesQuerySchema,
   type DashboardQuery,
   type CashflowQuery,
   type ForecastQuery,
   type MonthlyDashboardQuery,
+  type OperationalSummaryQuery,
   type PayablesQuery,
 } from './dashboard.schemas'
 
@@ -22,6 +24,20 @@ export const dashboardRouter = Router()
 
 dashboardRouter.use(authenticate)
 dashboardRouter.use(requireCompany)
+
+// GET /api/v1/dashboard/operational-summary
+dashboardRouter.get(
+  '/operational-summary',
+  anyMember,
+  validate(operationalSummaryQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const data = await DashboardService.operationalSummary(
+      req.company!.id,
+      req.query as unknown as OperationalSummaryQuery,
+    )
+    res.json({ success: true, data })
+  }),
+)
 
 // GET /api/v1/dashboard/live
 dashboardRouter.get(

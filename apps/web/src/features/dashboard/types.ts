@@ -138,3 +138,54 @@ export interface DashboardLive {
   alerts: DashboardLiveAlert[]
   recentMovements: DashboardLiveMovement[]
 }
+
+export type OperationalSummaryMode = 'current-month' | 'next-30-days'
+
+export interface OperationalSummaryItem {
+  id: string
+  type: 'REVENUE' | 'EXPENSE' | 'BILL' | 'PAYROLL'
+  title: string
+  date: string
+  amount: number
+  status: string
+  isOverdue: boolean
+  isToday: boolean
+  supplier?: { id: string; name: string } | null
+  category?: { id: string; name: string } | null
+}
+
+export interface DashboardOperationalSummary {
+  period: {
+    mode: OperationalSummaryMode
+    startDate: string
+    endDate: string
+  }
+  receivables: {
+    totalPending: number
+    count: number
+    overdueCount: number
+    dueTodayCount: number
+    items: OperationalSummaryItem[]
+  }
+  payables: {
+    totalPending: number
+    count: number
+    overdueCount: number
+    dueTodayCount: number
+    items: OperationalSummaryItem[]
+  }
+  payroll: {
+    expected: number
+    paid: number
+    remaining: number
+  }
+  summary: {
+    totalToReceive: number
+    totalToPay: number
+    expectedBalance: number
+  }
+  nextEvents: {
+    nextReceivable: OperationalSummaryItem | null
+    nextPayable: OperationalSummaryItem | null
+  }
+}

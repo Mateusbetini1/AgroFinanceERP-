@@ -25,6 +25,10 @@ export const payablesQuerySchema = dashboardQuerySchema.extend({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+export const operationalSummaryQuerySchema = z.object({
+  mode: z.enum(['current-month', 'next-30-days']).default('current-month'),
+})
+
 export const monthlyDashboardQuerySchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
   year: z.coerce.number().int().min(2000).max(2100),
@@ -34,4 +38,5 @@ export type DashboardQuery = z.infer<typeof dashboardQuerySchema>
 export type CashflowQuery = z.infer<typeof cashflowQuerySchema>
 export type ForecastQuery = z.infer<typeof forecastQuerySchema>
 export type PayablesQuery = z.infer<typeof payablesQuerySchema>
+export type OperationalSummaryQuery = z.infer<typeof operationalSummaryQuerySchema>
 export type MonthlyDashboardQuery = z.infer<typeof monthlyDashboardQuerySchema>

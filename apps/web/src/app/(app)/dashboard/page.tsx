@@ -1,56 +1,53 @@
 'use client'
 
 import {
-  AlertCircle,
+  AlertTriangle,
   ArrowDownCircle,
   ArrowUpCircle,
+  Banknote,
   CalendarClock,
-  Landmark,
+  CheckCircle2,
+  Clock3,
+  PlusCircle,
   RefreshCcw,
-  UserRound,
-  WalletCards,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { useState, type ComponentType } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { getDashboardLive, getDashboardMonthly } from '@/features/dashboard/api'
-import { FinancialPositionSection } from '@/features/dashboard/components/financial-position-section'
-import { MobileDashboardHome } from '@/features/dashboard/components/mobile-dashboard-home'
-import { AlertsCenter } from '@/features/notifications/components/alerts-center'
-import { PushNotificationCard } from '@/features/notifications/components/push-notification-card'
-import { formatCurrency, formatEmployeeType } from '@/lib/utils'
+import { getDashboardOperationalSummary } from '@/features/dashboard/api'
+import type { OperationalSummaryItem, OperationalSummaryMode } from '@/features/dashboard/types'
+import { cn, formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
 
-type KpiTone = 'default' | 'positive' | 'negative' | 'warning'
+type SummaryTone = 'default' | 'positive' | 'negative' | 'warning'
 
-const months = [
-  { value: 1, label: 'Janeiro' },
-  { value: 2, label: 'Fevereiro' },
-  { value: 3, label: 'Março' },
-  { value: 4, label: 'Abril' },
-  { value: 5, label: 'Maio' },
-  { value: 6, label: 'Junho' },
-  { value: 7, label: 'Julho' },
-  { value: 8, label: 'Agosto' },
-  { value: 9, label: 'Setembro' },
-  { value: 10, label: 'Outubro' },
-  { value: 11, label: 'Novembro' },
-  { value: 12, label: 'Dezembro' },
+const modes: Array<{ value: OperationalSummaryMode; label: string }> = [
+  { value: 'current-month', label: 'Mes atual' },
+  { value: 'next-30-days', label: 'Proximos 30 dias' },
 ]
 
-function KpiCard({
+const quickActions = [
+  { href: '/revenues', label: 'Nova receita' },
+  { href: '/expenses', label: 'Nova despesa' },
+  { href: '/bills', label: 'Novo boleto' },
+  { href: '/employee-payments', label: 'Pagamento funcionario' },
+]
+
+function SummaryCard({
   title,
   value,
+  detail,
   icon: Icon,
   tone = 'default',
 }: {
   title: string
   value: string
+  detail?: string
   icon: ComponentType<{ className?: string }>
-  tone?: KpiTone
+  tone?: SummaryTone
 }) {
   const toneClass = {
     default: 'bg-primary/10 text-primary',
@@ -61,27 +58,171 @@ function KpiCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className={`rounded-md p-2 ${toneClass}`}>
+        <div className={cn('rounded-md p-2', toneClass)}>
           <Icon className="h-4 w-4" />
         </div>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-semibold tracking-normal">{value}</p>
+        {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
   )
 }
 
-function LoadingGrid() {
+function statusBadge(item: OperationalSummaryItem) {
+  if (item.isOverdue) return <Badge variant="destructive">Vencido</Badge>
+  if (item.isToday) return <Badge variant="warning">Hoje</Badge>
+  return <Badge variant="muted">{formatStatusLabel(item.status)}</Badge>
+}
+
+function itemTypeLabel(type: OperationalSummaryItem['type']) {
+  const labels = {
+    REVENUE: 'Receita',
+    EXPENSE: 'Despesa',
+    BILL: 'Boleto',
+    PAYROLL: 'Folha',
+  }
+
+  return labels[type]
+}
+
+function EventLine({ label, item }: { label: string; item: OperationalSummaryItem | null }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 9 }).map((_, index) => (
+    <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+        <p className="truncate text-sm font-medium">{item ? item.title : 'Nenhum item aberto'}</p>
+      </div>
+      {item && (
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold">{formatCurrency(item.amount)}</p>
+          <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttentionNow({
+  overduePayables,
+  dueTodayPayables,
+  overdueReceivables,
+  dueTodayReceivables,
+  nextPayable,
+  nextReceivable,
+}: {
+  overduePayables: number
+  dueTodayPayables: number
+  overdueReceivables: number
+  dueTodayReceivables: number
+  nextPayable: OperationalSummaryItem | null
+  nextReceivable: OperationalSummaryItem | null
+}) {
+  const alerts = [
+    { label: 'Pagamentos vencidos', value: overduePayables, tone: overduePayables > 0 ? 'text-destructive' : 'text-muted-foreground' },
+    { label: 'Pagamentos hoje', value: dueTodayPayables, tone: dueTodayPayables > 0 ? 'text-amber-700' : 'text-muted-foreground' },
+    { label: 'Recebimentos atrasados', value: overdueReceivables, tone: overdueReceivables > 0 ? 'text-destructive' : 'text-muted-foreground' },
+    { label: 'Recebimentos hoje', value: dueTodayReceivables, tone: dueTodayReceivables > 0 ? 'text-amber-700' : 'text-muted-foreground' },
+  ]
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          Atencao agora
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {alerts.map((alert) => (
+            <div key={alert.label} className="rounded-md border border-border px-3 py-2">
+              <p className="text-xs text-muted-foreground">{alert.label}</p>
+              <p className={cn('text-xl font-semibold', alert.tone)}>{alert.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <EventLine label="Proximo pagamento" item={nextPayable} />
+          <EventLine label="Proximo recebimento" item={nextReceivable} />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PendingList({
+  title,
+  items,
+  count,
+  emptyText,
+  href,
+}: {
+  title: string
+  items: OperationalSummaryItem[]
+  count: number
+  emptyText: string
+  href: string
+}) {
+  const visibleItems = items.slice(0, 5)
+  const hasMore = count > visibleItems.length
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <div>
+          <CardTitle className="text-base">{title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{count} em aberto</p>
+        </div>
+        {hasMore && (
+          <Link href={href} className="text-sm font-medium text-primary hover:underline">
+            Ver todos
+          </Link>
+        )}
+      </CardHeader>
+      <CardContent>
+        {visibleItems.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4" />
+            {emptyText}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {visibleItems.map((item) => (
+              <div key={`${item.type}-${item.id}`} className="grid grid-cols-[1fr_auto] gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className={cn('truncate text-sm font-medium', item.isOverdue && 'text-destructive')}>
+                      {item.title}
+                    </p>
+                    {statusBadge(item)}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {itemTypeLabel(item.type)} - {formatDate(item.date)}
+                    {item.supplier ? ` - ${item.supplier.name}` : ''}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold">{formatCurrency(item.amount)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {Array.from({ length: 5 }).map((_, index) => (
         <Card key={index}>
           <CardHeader className="space-y-3">
-            <div className="h-4 w-28 rounded bg-muted" />
-            <div className="h-8 w-36 rounded bg-muted" />
+            <div className="h-4 w-24 rounded bg-muted" />
+            <div className="h-8 w-32 rounded bg-muted" />
           </CardHeader>
         </Card>
       ))}
@@ -90,103 +231,58 @@ function LoadingGrid() {
 }
 
 export default function DashboardPage() {
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
-
-  const liveQuery = useQuery({
-    queryKey: ['dashboard', 'live'],
-    queryFn: getDashboardLive,
-  })
-
+  const [mode, setMode] = useState<OperationalSummaryMode>('current-month')
   const query = useQuery({
-    queryKey: ['dashboard', 'monthly', month, year],
-    queryFn: () => getDashboardMonthly(month, year),
+    queryKey: ['dashboard', 'operational-summary', mode],
+    queryFn: () => getDashboardOperationalSummary(mode),
   })
 
-  const payrollEmployees = query.data?.payroll.employees ?? []
+  const balanceTone = (query.data?.summary.expectedBalance ?? 0) >= 0 ? 'positive' : 'negative'
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-normal text-foreground lg:text-2xl">Dashboard</h1>
-          <p className="hidden text-sm text-muted-foreground sm:block">
-            Visão financeira atual, compromissos, projeções e folha de funcionários.
-          </p>
+          <h1 className="text-xl font-semibold tracking-normal text-foreground lg:text-2xl">Painel do mes</h1>
+          <p className="text-sm text-muted-foreground">Recebimentos e pagamentos em aberto, ordenados por data.</p>
         </div>
 
-        <div className="grid grid-cols-[1fr_96px] gap-2 sm:flex sm:items-end sm:gap-3">
-          <div className="space-y-1 lg:space-y-2">
-            <Label htmlFor="dashboard-month">Mês</Label>
-            <Select id="dashboard-month" value={String(month)} onChange={(event) => setMonth(Number(event.target.value))}>
-              {months.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="space-y-1 lg:space-y-2">
-            <Label htmlFor="dashboard-year">Ano</Label>
-            <Input
-              id="dashboard-year"
-              type="number"
-              min="2000"
-              max="2100"
-              value={year}
-              onChange={(event) => setYear(Number(event.target.value))}
-            />
-          </div>
-
-          <Button type="button" variant="outline" className="col-span-2 h-9 sm:col-span-1 sm:h-10" onClick={() => void query.refetch()}>
+        <div className="grid gap-2 sm:grid-cols-[190px_auto] sm:items-end">
+          <Select value={mode} onChange={(event) => setMode(event.target.value as OperationalSummaryMode)}>
+            {modes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </Select>
+          <Button type="button" variant="outline" onClick={() => void query.refetch()} loading={query.isFetching}>
             <RefreshCcw className="h-4 w-4" />
-            Atualizar mês
+            Atualizar
           </Button>
         </div>
       </div>
 
-      <MobileDashboardHome
-        live={liveQuery.data}
-        monthly={query.data}
-        isLiveLoading={liveQuery.isLoading}
-        isLiveError={liveQuery.isError}
-        onRetryLive={() => void liveQuery.refetch()}
-      />
-
-      <div className="hidden lg:block">
-        <AlertsCenter className="mb-6" />
-        <div className="mb-6">
-          <PushNotificationCard />
-        </div>
-        <FinancialPositionSection
-          data={liveQuery.data}
-          isLoading={liveQuery.isLoading}
-          isError={liveQuery.isError}
-          onRetry={() => void liveQuery.refetch()}
-        />
+      <div className="flex flex-wrap gap-2">
+        {quickActions.map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <PlusCircle className="h-4 w-4" />
+            {action.label}
+          </Link>
+        ))}
       </div>
 
-      <div className="hidden lg:block">
-        <h2 className="text-xl font-semibold tracking-normal text-foreground">Visão mensal</h2>
-        <p className="text-sm text-muted-foreground">
-          Caixa realizado, pendências e folha do mês selecionado.
-        </p>
-      </div>
-
-      {query.isLoading && (
-        <div className="hidden lg:block">
-          <LoadingGrid />
-        </div>
-      )}
+      {query.isLoading && <LoadingState />}
 
       {query.isError && (
         <Card>
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              <p className="font-medium">Não foi possível carregar o dashboard mensal.</p>
+              <AlertTriangle className="h-5 w-5" />
+              <p className="font-medium">Nao foi possivel carregar o painel operacional.</p>
             </div>
             <Button type="button" variant="outline" onClick={() => void query.refetch()}>
               Tentar novamente
@@ -196,98 +292,70 @@ export default function DashboardPage() {
       )}
 
       {query.data && (
-        <div className="hidden space-y-6 lg:block">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <KpiCard
-              title="Receitas realizadas"
-              value={formatCurrency(query.data.realizedRevenue)}
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <SummaryCard
+              title="A receber"
+              value={formatCurrency(query.data.summary.totalToReceive)}
+              detail={`${query.data.receivables.count} pendente(s)`}
               icon={ArrowUpCircle}
               tone="positive"
             />
-            <KpiCard title="Receitas pendentes" value={formatCurrency(query.data.pendingRevenue)} icon={CalendarClock} />
-            <KpiCard
-              title="Saídas pagas"
-              value={formatCurrency(query.data.realizedOutflows)}
+            <SummaryCard
+              title="A pagar"
+              value={formatCurrency(query.data.summary.totalToPay)}
+              detail={`${query.data.payables.count} pendente(s)`}
               icon={ArrowDownCircle}
               tone="negative"
             />
-            <KpiCard
-              title="Despesas e boletos pendentes"
-              value={formatCurrency(query.data.pendingExpenses + query.data.pendingBills)}
-              icon={WalletCards}
+            <SummaryCard
+              title="Saldo previsto"
+              value={formatCurrency(query.data.summary.expectedBalance)}
+              detail="A receber menos a pagar"
+              icon={Banknote}
+              tone={balanceTone}
+            />
+            <SummaryCard
+              title="Recebimentos"
+              value={String(query.data.receivables.count)}
+              detail="Itens em aberto"
+              icon={CalendarClock}
+            />
+            <SummaryCard
+              title="Pagamentos"
+              value={String(query.data.payables.count)}
+              detail="Itens em aberto"
+              icon={Clock3}
               tone="warning"
-            />
-            <KpiCard title="Folha prevista" value={formatCurrency(query.data.payroll.payrollExpected)} icon={UserRound} />
-            <KpiCard
-              title="Folha já paga"
-              value={formatCurrency(query.data.payroll.payrollTotalPaid)}
-              icon={UserRound}
-              tone="negative"
-            />
-            <KpiCard
-              title="Falta pagar folha"
-              value={formatCurrency(query.data.payroll.payrollRemaining)}
-              icon={UserRound}
-              tone="warning"
-            />
-            <KpiCard
-              title="Resultado realizado"
-              value={formatCurrency(query.data.realizedResult)}
-              icon={Landmark}
-              tone={query.data.realizedResult >= 0 ? 'positive' : 'negative'}
-            />
-            <KpiCard
-              title="Resultado previsto"
-              value={formatCurrency(query.data.projectedResult)}
-              icon={Landmark}
-              tone={query.data.projectedResult >= 0 ? 'positive' : 'negative'}
             />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Folha do mês</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Mensalistas ativos entram automaticamente na folha prevista. Diaristas aparecem apenas pelo total pago
-                enquanto não houver módulo de dias trabalhados.
-              </p>
-            </CardHeader>
-            <CardContent>
-              {payrollEmployees.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum funcionário ou pagamento encontrado para este mês.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
-                        <th className="px-4 py-3">Funcionário</th>
-                        <th className="px-4 py-3">Tipo</th>
-                        <th className="px-4 py-3 text-right">Salário previsto</th>
-                        <th className="px-4 py-3 text-right">Pago salário</th>
-                        <th className="px-4 py-3 text-right">Extras</th>
-                        <th className="px-4 py-3 text-right">Total pago</th>
-                        <th className="px-4 py-3 text-right">Falta pagar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payrollEmployees.map((employee) => (
-                        <tr key={employee.employeeId} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-3 font-medium">{employee.employeeName}</td>
-                          <td className="px-4 py-3">{formatEmployeeType(employee.employeeType)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(employee.expectedSalary)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(employee.salaryPaid)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(employee.extrasPaid + employee.dailyPaid)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(employee.totalPaid)}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(employee.remainingSalary)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+          <AttentionNow
+            overduePayables={query.data.payables.overdueCount}
+            dueTodayPayables={query.data.payables.dueTodayCount}
+            overdueReceivables={query.data.receivables.overdueCount}
+            dueTodayReceivables={query.data.receivables.dueTodayCount}
+            nextPayable={query.data.nextEvents.nextPayable}
+            nextReceivable={query.data.nextEvents.nextReceivable}
+          />
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <PendingList
+              title="A receber"
+              items={query.data.receivables.items}
+              count={query.data.receivables.count}
+              emptyText="Nenhum recebimento pendente no periodo."
+              href="/revenues"
+            />
+            <PendingList
+              title="A pagar"
+              items={query.data.payables.items}
+              count={query.data.payables.count}
+              emptyText="Nenhum pagamento pendente no periodo."
+              href="/expenses"
+            />
+          </div>
+        </>
       )}
     </div>
   )

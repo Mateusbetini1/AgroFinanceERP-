@@ -1,5 +1,11 @@
 import { prisma } from '../../config/prisma'
-import type { DashboardQuery, CashflowQuery, ForecastQuery, PayablesQuery } from './dashboard.schemas'
+import type {
+  DashboardQuery,
+  CashflowQuery,
+  ForecastQuery,
+  OperationalSummaryQuery,
+  PayablesQuery,
+} from './dashboard.schemas'
 import { getPayrollSummary } from '../employee-payment/payroll-summary.service'
 import { getMonthPeriod } from '../../shared/utils/month-period'
 
@@ -46,6 +52,19 @@ type RecentMovement = {
   toAccountName?: string
   relatedEntityType: string
   relatedEntityId: string
+}
+
+type OperationalItem = {
+  id: string
+  type: 'REVENUE' | 'EXPENSE' | 'BILL' | 'PAYROLL'
+  title: string
+  date: Date
+  amount: number
+  status: string
+  isOverdue: boolean
+  isToday: boolean
+  supplier?: { id: string; name: string } | null
+  category?: { id: string; name: string } | null
 }
 
 type ForecastAlertLevel = 'OK' | 'WARNING' | 'NEGATIVE'
@@ -97,6 +116,10 @@ function addDays(date: Date, days: number) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
 }
 
+function endOfMonthDate(year: number, monthIndex: number) {
+  return new Date(year, monthIndex + 1, 0)
+}
+
 function isInPeriod(date: Date, start: Date, end: Date) {
   return date >= start && date < end
 }
@@ -114,6 +137,39 @@ function getDefaultPeriod(query: DashboardQuery): { start: Date; end: Date } {
   const start = query.dateFrom ?? new Date(now.getFullYear(), now.getMonth(), 1)
   const end = query.dateTo ?? new Date(now.getFullYear(), now.getMonth() + 1, 1)
   return { start, end }
+}
+
+function getOperationalPeriod(mode: OperationalSummaryQuery['mode'], now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  if (mode === 'next-30-days') {
+    return { start: today, end: addDays(today, 30) }
+  }
+
+  return {
+    start: new Date(today.getFullYear(), today.getMonth(), 1),
+    end: new Date(today.getFullYear(), today.getMonth() + 1, 1),
+  }
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function getPayrollMonthsForPeriod(start: Date, end: Date, today: Date) {
+  const months: Array<{ month: number; year: number; dueDate: Date }> = []
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+  const last = new Date(end.getFullYear(), end.getMonth(), 1)
+
+  while (cursor <= last) {
+    const dueDate = endOfMonthDate(cursor.getFullYear(), cursor.getMonth())
+    if (dueDate < end && (dueDate >= start || dueDate < today)) {
+      months.push({ month: cursor.getMonth() + 1, year: cursor.getFullYear(), dueDate })
+    }
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+
+  return months
 }
 
 function defaultBounds(query: DashboardQuery, useDefaultPeriod = true) {
@@ -325,6 +381,180 @@ export const DashboardService = {
     return DashboardService.overview(companyId, {})
   },
 
+  async operationalSummary(companyId: string, query: OperationalSummaryQuery) {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const tomorrow = addDays(today, 1)
+    const period = getOperationalPeriod(query.mode, now)
+    const boundsUntilEnd = { lt: period.end }
+
+    const [revenues, expenses, bills] = await Promise.all([
+      prisma.revenue.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PENDING',
+          OR: [{ receivedAt: boundsUntilEnd }, { receivedAt: null, date: boundsUntilEnd }],
+        },
+        select: {
+          id: true,
+          date: true,
+          receivedAt: true,
+          totalAmount: true,
+          status: true,
+          client: true,
+          notes: true,
+          product: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.expense.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          OR: [{ dueDate: boundsUntilEnd }, { dueDate: null, date: boundsUntilEnd }],
+        },
+        select: {
+          id: true,
+          description: true,
+          amount: true,
+          status: true,
+          date: true,
+          dueDate: true,
+          category: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.bill.findMany({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          dueDate: boundsUntilEnd,
+        },
+        select: {
+          id: true,
+          description: true,
+          amount: true,
+          status: true,
+          dueDate: true,
+          category: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
+        },
+      }),
+    ])
+
+    const payrollSummaries = await Promise.all(
+      getPayrollMonthsForPeriod(period.start, period.end, today).map(async (month) => ({
+        ...month,
+        summary: await getPayrollSummary(companyId, month.month, month.year),
+      })),
+    )
+
+    const markDate = (date: Date) => ({
+      isOverdue: date < today,
+      isToday: date >= today && date < tomorrow,
+    })
+
+    const receivableItems: OperationalItem[] = revenues
+      .map((revenue) => {
+        const expectedDate = revenue.receivedAt ?? revenue.date
+        return {
+          id: revenue.id,
+          type: 'REVENUE' as const,
+          title: revenue.client ?? revenue.product.name,
+          date: expectedDate,
+          amount: toNumber(revenue.totalAmount),
+          status: revenue.status,
+          ...markDate(expectedDate),
+        }
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+    const payableItems: OperationalItem[] = [
+      ...expenses.map((expense) => {
+        const dueDate = expense.dueDate ?? expense.date
+        return {
+          id: expense.id,
+          type: 'EXPENSE' as const,
+          title: expense.description,
+          date: dueDate,
+          amount: toNumber(expense.amount),
+          status: expense.status,
+          category: expense.category,
+          supplier: expense.supplier,
+          ...markDate(dueDate),
+        }
+      }),
+      ...bills.map((bill) => ({
+        id: bill.id,
+        type: 'BILL' as const,
+        title: bill.description,
+        date: bill.dueDate,
+        amount: toNumber(bill.amount),
+        status: bill.status,
+        category: bill.category,
+        supplier: bill.supplier,
+        ...markDate(bill.dueDate),
+      })),
+      ...payrollSummaries
+        .filter((payroll) => payroll.summary.payrollRemaining > 0)
+        .map((payroll) => ({
+          id: `payroll-${payroll.year}-${payroll.month}`,
+          type: 'PAYROLL' as const,
+          title: 'Folha de pagamento',
+          date: payroll.dueDate,
+          amount: payroll.summary.payrollRemaining,
+          status: 'PENDING',
+          ...markDate(payroll.dueDate),
+        })),
+    ].sort((a, b) => a.date.getTime() - b.date.getTime())
+
+    const payroll = payrollSummaries.reduce(
+      (total, item) => ({
+        expected: total.expected + item.summary.payrollExpected,
+        paid: total.paid + item.summary.payrollSalaryPaid,
+        remaining: total.remaining + item.summary.payrollRemaining,
+      }),
+      { expected: 0, paid: 0, remaining: 0 },
+    )
+
+    const totalToReceive = receivableItems.reduce((sum, item) => sum + item.amount, 0)
+    const totalToPay = payableItems.reduce((sum, item) => sum + item.amount, 0)
+
+    return {
+      period: {
+        mode: query.mode,
+        startDate: period.start,
+        endDate: period.end,
+      },
+      receivables: {
+        totalPending: totalToReceive,
+        count: receivableItems.length,
+        overdueCount: receivableItems.filter((item) => item.isOverdue).length,
+        dueTodayCount: receivableItems.filter((item) => item.isToday).length,
+        items: receivableItems,
+      },
+      payables: {
+        totalPending: totalToPay,
+        count: payableItems.length,
+        overdueCount: payableItems.filter((item) => item.isOverdue).length,
+        dueTodayCount: payableItems.filter((item) => item.isToday).length,
+        items: payableItems,
+      },
+      payroll,
+      summary: {
+        totalToReceive,
+        totalToPay,
+        expectedBalance: totalToReceive - totalToPay,
+      },
+      nextEvents: {
+        nextReceivable: receivableItems.find((item) => item.date >= today) ?? null,
+        nextPayable: payableItems.find((item) => item.date >= today) ?? null,
+      },
+    }
+  },
+
   async live(companyId: string) {
     const now = new Date()
     const today = getDayPeriod(now)
@@ -425,6 +655,7 @@ export const DashboardService = {
           date: true,
           receivedAt: true,
           totalAmount: true,
+          status: true,
           client: true,
           notes: true,
           product: { select: { name: true } },
