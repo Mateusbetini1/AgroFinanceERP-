@@ -241,6 +241,14 @@ function addMonthsToDate(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1)
 }
 
+function payableBreakdown(items: OperationalSummaryItem[]) {
+  const payroll = items.filter((item) => item.type === 'PAYROLL').length
+  const bills = items.filter((item) => item.type === 'BILL').length
+  const expenses = items.filter((item) => item.type === 'EXPENSE').length
+
+  return `Folha: ${payroll} · Boletos: ${bills} · Despesas: ${expenses}`
+}
+
 export default function DashboardPage() {
   const now = new Date()
   const [mode, setMode] = useState<OperationalSummaryMode>('current-month')
@@ -368,9 +376,9 @@ export default function DashboardPage() {
               icon={CalendarClock}
             />
             <SummaryCard
-              title="Pagamentos"
+              title="Itens a pagar"
               value={String(query.data.payables.count)}
-              detail="Itens em aberto"
+              detail={payableBreakdown(query.data.payables.items)}
               icon={Clock3}
               tone="warning"
             />
