@@ -242,7 +242,7 @@ export default function EmployeePaymentsPage() {
                 {summary.employees.map((employee) => (
                   <div
                     key={employee.employeeId}
-                    className="grid gap-3 p-4 text-sm md:grid-cols-[1.4fr_repeat(4,1fr)] md:items-center"
+                    className="grid gap-3 p-4 text-sm md:grid-cols-[1.4fr_repeat(3,1fr)] md:items-center"
                   >
                     <div>
                       <p className="font-medium">{employee.employeeName}</p>
@@ -262,12 +262,10 @@ export default function EmployeePaymentsPage() {
                       <p className="text-xs text-muted-foreground">A pagar</p>
                       <p className="font-medium">{formatCurrency(employee.remainingSalary)}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Extras</p>
-                      <p className="font-medium">
-                        {formatCurrency(employee.advancePaid + employee.bonusPaid + employee.overtimePaid + employee.dailyPaid)}
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground md:col-span-4">
+                      Adiant.: {formatCurrency(employee.advancePaid)} · Bônus: {formatCurrency(employee.bonusPaid)} · Hora extra:{' '}
+                      {formatCurrency(employee.overtimePaid)} · Diárias: {formatCurrency(employee.dailyPaid)}
+                    </p>
                   </div>
                 ))}
               </div>
