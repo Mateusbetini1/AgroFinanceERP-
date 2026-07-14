@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { ApiResponse, EmployeePayment, PaginatedResponse, PaymentType } from '@/types/api'
+import type { ApiResponse, EmployeePayment, PaginatedResponse, PaymentType, PayrollSummary } from '@/types/api'
 
 export interface EmployeePaymentPayload {
   employeeId?: string
@@ -10,6 +10,11 @@ export interface EmployeePaymentPayload {
   referenceMonth?: number
   referenceYear?: number
   notes?: string | null
+}
+
+export interface EmployeePaymentFilters {
+  referenceMonth?: number
+  referenceYear?: number
 }
 
 function cleanCreateEmployeePaymentPayload(payload: EmployeePaymentPayload): EmployeePaymentPayload {
@@ -47,9 +52,16 @@ function cleanUpdateEmployeePaymentPayload(payload: EmployeePaymentPayload): Emp
   return clean
 }
 
-export async function listEmployeePayments() {
-  const { data } = await api.get<PaginatedResponse<EmployeePayment>>('/employee-payments')
+export async function listEmployeePayments(filters: EmployeePaymentFilters = {}) {
+  const { data } = await api.get<PaginatedResponse<EmployeePayment>>('/employee-payments', { params: filters })
   return data
+}
+
+export async function getPayrollSummary(year: number, month: number) {
+  const { data } = await api.get<ApiResponse<PayrollSummary>>('/employee-payments/payroll-summary', {
+    params: { year, month },
+  })
+  return data.data
 }
 
 export async function createEmployeePayment(payload: EmployeePaymentPayload) {

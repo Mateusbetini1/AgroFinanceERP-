@@ -424,3 +424,35 @@ export interface EmployeePayment {
   createdAt: string
   updatedAt: string
 }
+
+export interface PayrollEmployeeSummary {
+  employeeId: string
+  employeeName: string
+  employeeType: 'MONTHLY' | 'DAILY'
+  baseSalary: number
+  expectedSalary: number
+  salaryPayments: number
+  advancePaid: number
+  bonusPaid: number
+  overtimePaid: number
+  salaryPaid: number
+  remainingSalary: number
+  extrasPaid: number
+  dailyPaid: number
+  totalPaid: number
+}
+
+export interface PayrollSummary {
+  month: number
+  year: number
+  payrollExpected: number
+  payrollSalaryPaid: number
+  payrollRemaining: number
+  payrollExtrasPaid: number
+  payrollDailyPaid: number
+  payrollTotalPaid: number
+  employeesWithPendingSalary: number
+  employeeCount: number
+  totalsByType: Record<PaymentType, number>
+  employees: PayrollEmployeeSummary[]
+}

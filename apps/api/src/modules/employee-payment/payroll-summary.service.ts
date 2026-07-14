@@ -6,6 +6,10 @@ type PayrollEmployeeSummary = {
   employeeType: 'MONTHLY' | 'DAILY'
   baseSalary: number
   expectedSalary: number
+  salaryPayments: number
+  advancePaid: number
+  bonusPaid: number
+  overtimePaid: number
   salaryPaid: number
   remainingSalary: number
   extrasPaid: number
@@ -45,6 +49,10 @@ export async function getPayrollSummary(companyId: string, month: number, year: 
       employeeType: 'MONTHLY',
       baseSalary,
       expectedSalary: baseSalary,
+      salaryPayments: 0,
+      advancePaid: 0,
+      bonusPaid: 0,
+      overtimePaid: 0,
       salaryPaid: 0,
       remainingSalary: baseSalary,
       extrasPaid: 0,
@@ -63,6 +71,10 @@ export async function getPayrollSummary(companyId: string, month: number, year: 
         employeeType: employee.type,
         baseSalary: toNumber(employee.baseSalary),
         expectedSalary: 0,
+        salaryPayments: 0,
+        advancePaid: 0,
+        bonusPaid: 0,
+        overtimePaid: 0,
         salaryPaid: 0,
         remainingSalary: 0,
         extrasPaid: 0,
@@ -72,8 +84,22 @@ export async function getPayrollSummary(companyId: string, month: number, year: 
 
     const amount = toNumber(payment.amount)
 
-    if (payment.type === 'SALARY' || payment.type === 'ADVANCE') existing.salaryPaid += amount
-    if (payment.type === 'OVERTIME' || payment.type === 'BONUS') existing.extrasPaid += amount
+    if (payment.type === 'SALARY') {
+      existing.salaryPaid += amount
+      existing.salaryPayments += amount
+    }
+    if (payment.type === 'ADVANCE') {
+      existing.salaryPaid += amount
+      existing.advancePaid += amount
+    }
+    if (payment.type === 'OVERTIME') {
+      existing.extrasPaid += amount
+      existing.overtimePaid += amount
+    }
+    if (payment.type === 'BONUS') {
+      existing.extrasPaid += amount
+      existing.bonusPaid += amount
+    }
     if (payment.type === 'DAILY_WAGE') existing.dailyPaid += amount
 
     existing.totalPaid += amount
@@ -97,6 +123,14 @@ export async function getPayrollSummary(companyId: string, month: number, year: 
     payrollDailyPaid: rows.reduce((sum, item) => sum + item.dailyPaid, 0),
     payrollTotalPaid: rows.reduce((sum, item) => sum + item.totalPaid, 0),
     employeesWithPendingSalary: rows.filter((item) => item.remainingSalary > 0).length,
+    employeeCount: rows.length,
+    totalsByType: {
+      SALARY: rows.reduce((sum, item) => sum + item.salaryPayments, 0),
+      ADVANCE: rows.reduce((sum, item) => sum + item.advancePaid, 0),
+      BONUS: rows.reduce((sum, item) => sum + item.bonusPaid, 0),
+      OVERTIME: rows.reduce((sum, item) => sum + item.overtimePaid, 0),
+      DAILY_WAGE: rows.reduce((sum, item) => sum + item.dailyPaid, 0),
+    },
     employees: rows,
   }
 }

@@ -42,6 +42,7 @@ describe('getPayrollSummary', () => {
     expect(result.payrollSalaryPaid).toBe(1000)
     expect(result.payrollRemaining).toBe(1500)
     expect(result.payrollTotalPaid).toBe(1000)
+    expect(result.totalsByType.ADVANCE).toBe(1000)
   })
 
   it('OVERTIME e BONUS contam como extras mas nao abatem salario', async () => {
@@ -69,6 +70,8 @@ describe('getPayrollSummary', () => {
     expect(result.payrollSalaryPaid).toBe(0)
     expect(result.payrollRemaining).toBe(2500)
     expect(result.payrollTotalPaid).toBe(500)
+    expect(result.totalsByType.OVERTIME).toBe(200)
+    expect(result.totalsByType.BONUS).toBe(300)
   })
 
   it('DAILY nao gera expectedSalary e entra apenas pelo pagamento realizado', async () => {
@@ -87,6 +90,39 @@ describe('getPayrollSummary', () => {
     expect(result.payrollExpected).toBe(0)
     expect(result.payrollDailyPaid).toBe(180)
     expect(result.payrollTotalPaid).toBe(180)
+    expect(result.totalsByType.DAILY_WAGE).toBe(180)
     expect(result.employees[0]).toEqual(expect.objectContaining({ employeeType: 'DAILY', expectedSalary: 0, remainingSalary: 0 }))
+  })
+
+  it('filtra pagamentos pela empresa e competencia informada', async () => {
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+
+    await getPayrollSummary(companyId, 7, 2026)
+
+    expect(prismaMock.employee.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, deletedAt: null, status: 'ACTIVE', type: 'MONTHLY' },
+      }),
+    )
+    expect(prismaMock.employeePayment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId, deletedAt: null, referenceMonth: 7, referenceYear: 2026 },
+      }),
+    )
+  })
+
+  it('consulta resumo sem alterar saldo ou status', async () => {
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+
+    await getPayrollSummary(companyId, 7, 2026)
+
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.account.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.employee.update).not.toHaveBeenCalled()
+    expect(prismaMock.employee.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.employeePayment.update).not.toHaveBeenCalled()
+    expect(prismaMock.employeePayment.updateMany).not.toHaveBeenCalled()
   })
 })
