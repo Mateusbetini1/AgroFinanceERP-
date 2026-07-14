@@ -64,6 +64,7 @@ function revenue(overrides: Record<string, unknown> = {}) {
     notes: null,
     totalAmount: 900,
     date: new Date('2026-07-10T12:00:00.000Z'),
+    receivedAt: new Date('2026-07-17T12:00:00.000Z'),
     status: 'PENDING',
     product: { name: 'Tomate' },
     ...overrides,
@@ -194,7 +195,38 @@ describe('NotificationService.getAlerts', () => {
     const receivables = result.groups.find((group) => group.key === 'RECEIVABLES')!
 
     expect(itemIds(receivables.items)).toEqual(['revenue-pending'])
-    expect(receivables.items[0]).toMatchObject({ type: 'REVENUE', route: '/revenues', amount: 900 })
+    expect(receivables.items[0]).toMatchObject({
+      type: 'REVENUE',
+      route: '/revenues',
+      amount: 900,
+      date: new Date('2026-07-17T12:00:00.000Z').toISOString(),
+    })
+  })
+
+  it('usa receivedAt como data prevista de receita pendente, nao a data de emissao', async () => {
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.revenue.findMany.mockResolvedValue([
+      revenue({
+        id: 'revenue-pimentao',
+        client: null,
+        date: new Date('2026-07-10T12:00:00.000Z'),
+        receivedAt: new Date('2026-07-17T12:00:00.000Z'),
+        product: { name: 'Pimentao' },
+      }),
+    ])
+
+    const result = await NotificationService.getAlerts(companyId, {
+      referenceDate: new Date('2026-07-14T12:00:00.000Z'),
+    })
+    const receivables = result.groups.find((group) => group.key === 'RECEIVABLES')!
+
+    expect(receivables.items[0]).toMatchObject({
+      id: 'revenue-pimentao',
+      title: 'Receita de Pimentao',
+      date: new Date('2026-07-17T12:00:00.000Z').toISOString(),
+    })
+    expect(result.summary.overdueCount).toBe(0)
   })
 
   it('nao retorna boleto pago nem despesa paga', async () => {

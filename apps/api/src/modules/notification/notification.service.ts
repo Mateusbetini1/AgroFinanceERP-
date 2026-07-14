@@ -31,6 +31,7 @@ type RevenueSource = {
   notes: string | null
   totalAmount: unknown
   date: Date
+  receivedAt: Date | null
   status: string
   product?: { name: string } | null
 }
@@ -82,6 +83,10 @@ function revenueTitle(revenue: RevenueSource): string {
   if (revenue.client) return `Receita de ${revenue.client}`
   if (revenue.product?.name) return `Receita de ${revenue.product.name}`
   return 'Receita a receber'
+}
+
+function revenueExpectedReceiptDate(revenue: RevenueSource): Date {
+  return revenue.receivedAt ?? revenue.date
 }
 
 function sortItems(a: NotificationAlertItem, b: NotificationAlertItem) {
@@ -253,10 +258,11 @@ export const NotificationService = {
           notes: true,
           totalAmount: true,
           date: true,
+          receivedAt: true,
           status: true,
           product: { select: { name: true } },
         },
-        orderBy: { date: 'asc' },
+        orderBy: [{ receivedAt: 'asc' }, { date: 'asc' }],
       }),
     ])
 
@@ -282,13 +288,15 @@ export const NotificationService = {
     expenses.forEach((expense) => addPayable(expense, 'EXPENSE', '/expenses'))
 
     for (const revenue of revenues) {
+      const expectedReceiptDate = revenueExpectedReceiptDate(revenue)
+
       byKey.get('RECEIVABLES')!.items.push({
         id: revenue.id,
         type: 'REVENUE',
         title: revenueTitle(revenue),
         description: revenue.notes ?? revenue.product?.name ?? revenue.client ?? 'Receita pendente',
         amount: toNumber(revenue.totalAmount),
-        date: revenue.date.toISOString(),
+        date: expectedReceiptDate.toISOString(),
         status: revenue.status,
         route: '/revenues',
         severity: 'LOW',

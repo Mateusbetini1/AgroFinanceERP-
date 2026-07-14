@@ -4,11 +4,11 @@ import { prismaMock, resetPrismaMock } from '../../test/prisma-mock'
 
 const companyId = 'company-1'
 
-function pendingRevenue(id: string, date: Date, amount: number, client: string) {
+function pendingRevenue(id: string, date: Date, amount: number, client: string, receivedAt: Date | null = null) {
   return {
     id,
     date,
-    receivedAt: null,
+    receivedAt,
     totalAmount: amount,
     status: 'PENDING',
     client,
@@ -47,6 +47,34 @@ describe('DashboardService.operationalSummary', () => {
     resetPrismaMock()
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 6, 14, 10, 0, 0))
+  })
+
+  it('ordena receitas e calcula vencido/proximo recebimento pela data prevista de recebimento', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([
+      pendingRevenue('revenue-17', new Date(2026, 6, 10), 1200, 'Cliente Pimentao', new Date(2026, 6, 17)),
+      pendingRevenue('revenue-15', new Date(2026, 6, 12), 800, 'Cliente Tomate', new Date(2026, 6, 15)),
+    ])
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+
+    const result = await DashboardService.operationalSummary(companyId, { mode: 'current-month' })
+
+    expect(result.receivables.items.map((item) => item.id)).toEqual(['revenue-15', 'revenue-17'])
+    expect(result.receivables.items[1]).toEqual(
+      expect.objectContaining({
+        id: 'revenue-17',
+        date: new Date(2026, 6, 17),
+        isOverdue: false,
+        isToday: false,
+      }),
+    )
+    expect(result.receivables.overdueCount).toBe(0)
+    expect(result.nextEvents.nextReceivable?.id).toBe('revenue-15')
+    expect(prismaMock.revenue.update).not.toHaveBeenCalled()
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
   })
 
   afterEach(() => {
