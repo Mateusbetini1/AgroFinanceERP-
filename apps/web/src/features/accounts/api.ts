@@ -1,6 +1,54 @@
 import { api } from '@/lib/api'
 import type { Account, AccountType, ApiResponse, PaginatedResponse } from '@/types/api'
 
+export type AccountSummarySourceType = 'REVENUE' | 'EXPENSE' | 'BILL' | 'EMPLOYEE_PAYMENT' | 'TRANSFER'
+export type AccountSummaryDirection = 'INFLOW' | 'OUTFLOW'
+
+export interface AccountSummaryPendingItem {
+  id: string
+  date: string
+  description: string
+  amount: number
+  status: string
+  sourceType: AccountSummarySourceType
+  supplier?: { id: string; name: string } | null
+  category?: { id: string; name: string } | null
+}
+
+export interface AccountSummaryMovement {
+  id: string
+  date: string
+  sourceType: AccountSummarySourceType
+  description: string
+  amount: number
+  direction: AccountSummaryDirection
+  relatedId: string
+}
+
+export interface AccountSummary {
+  account: Account
+  period: {
+    year: number
+    month: number
+    startDate: string
+    endDate: string
+  }
+  totals: {
+    inflows: number
+    outflows: number
+    net: number
+    pendingInflows: number
+    pendingOutflows: number
+  }
+  pending: {
+    revenues: AccountSummaryPendingItem[]
+    expenses: AccountSummaryPendingItem[]
+    bills: AccountSummaryPendingItem[]
+    employeePayments: AccountSummaryPendingItem[]
+  }
+  movements: AccountSummaryMovement[]
+}
+
 export interface AccountPayload {
   name: string
   type: AccountType
@@ -42,6 +90,11 @@ function cleanUpdateAccountPayload(payload: Omit<AccountPayload, 'initialBalance
 export async function listAccounts() {
   const { data } = await api.get<PaginatedResponse<Account>>('/accounts')
   return data
+}
+
+export async function getAccountSummary(id: string, period: { month: number; year: number }) {
+  const { data } = await api.get<ApiResponse<AccountSummary>>(`/accounts/${id}/summary`, { params: period })
+  return data.data
 }
 
 export async function createAccount(payload: AccountPayload) {

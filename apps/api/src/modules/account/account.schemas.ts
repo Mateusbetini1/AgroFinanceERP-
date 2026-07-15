@@ -40,6 +40,12 @@ export const listAccountsSchema = paginationSchema.extend({
 
 export const accountParamsSchema = z.object({ id: uuidSchema })
 
+export const accountSummaryQuerySchema = z.object({
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+})
+
 export type CreateAccountDto = z.infer<typeof createAccountSchema>
 export type UpdateAccountDto = z.infer<typeof updateAccountSchema>
 export type ListAccountsQuery = z.infer<typeof listAccountsSchema>
+export type AccountSummaryQuery = z.infer<typeof accountSummaryQuerySchema>

@@ -10,7 +10,9 @@ import {
   updateAccountSchema,
   listAccountsSchema,
   accountParamsSchema,
+  accountSummaryQuerySchema,
   type ListAccountsQuery,
+  type AccountSummaryQuery,
 } from './account.schemas'
 
 export const accountRouter = Router()
@@ -40,6 +42,22 @@ accountRouter.post(
   asyncHandler(async (req, res) => {
     const account = await AccountService.create(req.company!.id, req.body, req)
     res.status(201).json({ success: true, data: account })
+  }),
+)
+
+// GET /api/v1/accounts/:id/summary
+accountRouter.get(
+  '/:id/summary',
+  anyMember,
+  validate(accountParamsSchema, 'params'),
+  validate(accountSummaryQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const summary = await AccountService.summary(
+      req.company!.id,
+      req.params.id,
+      req.query as unknown as AccountSummaryQuery,
+    )
+    res.json({ success: true, data: summary })
   }),
 )
 
