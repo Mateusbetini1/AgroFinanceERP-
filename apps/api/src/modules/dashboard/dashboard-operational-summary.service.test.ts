@@ -42,11 +42,22 @@ function pendingBill(id: string, dueDate: Date, amount: number, description: str
   }
 }
 
+function account(id: string, name: string, currentBalance: number, active = true) {
+  return {
+    id,
+    name,
+    type: 'BANK',
+    currentBalance,
+    active,
+  }
+}
+
 describe('DashboardService.operationalSummary', () => {
   beforeEach(() => {
     resetPrismaMock()
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 6, 14, 10, 0, 0))
+    prismaMock.account.findMany.mockResolvedValue([])
   })
 
   it('ordena receitas e calcula vencido/proximo recebimento pela data prevista de recebimento', async () => {
@@ -114,6 +125,7 @@ describe('DashboardService.operationalSummary', () => {
     expect(result.summary.totalToReceive).toBe(2000)
     expect(result.summary.totalToPay).toBe(2300)
     expect(result.summary.expectedBalance).toBe(-300)
+    expect(result.accountBalances.projectedBalanceAfterPeriod).toBe(-300)
     expect(result.receivables.count).toBe(2)
     expect(result.payables.count).toBe(3)
     expect(result.payroll).toEqual({ expected: 2500, paid: 1000, remaining: 1500 })
@@ -206,6 +218,69 @@ describe('DashboardService.operationalSummary', () => {
         where: expect.objectContaining({ status: { in: ['PENDING', 'OVERDUE'] } }),
       }),
     )
+  })
+
+  it('retorna somente contas ativas da empresa atual e soma currentBalance', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([])
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+    prismaMock.account.findMany.mockResolvedValue([
+      account('account-bb', 'Katia Banco do Brasil', 0),
+      account('account-sicoob', 'Sicoob Katia', -3584.13),
+    ])
+
+    const result = await DashboardService.operationalSummary(companyId, { mode: 'current-month' })
+
+    expect(prismaMock.account.findMany).toHaveBeenCalledWith({
+      where: { companyId, deletedAt: null, active: true },
+      select: { id: true, name: true, type: true, currentBalance: true, active: true },
+      orderBy: { name: 'asc' },
+    })
+    expect(result.accountBalances).toEqual({
+      totalCurrentBalance: -3584.13,
+      projectedBalanceAfterPeriod: -3584.13,
+      accounts: [
+        {
+          id: 'account-bb',
+          name: 'Katia Banco do Brasil',
+          type: 'BANK',
+          currentBalance: 0,
+          active: true,
+        },
+        {
+          id: 'account-sicoob',
+          name: 'Sicoob Katia',
+          type: 'BANK',
+          currentBalance: -3584.13,
+          active: true,
+        },
+      ],
+    })
+  })
+
+  it('calcula saldo projetado com totalCurrentBalance mais saldo previsto do periodo', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([
+      pendingRevenue('revenue-1', new Date(2026, 6, 20), 2000, 'Cliente A'),
+    ])
+    prismaMock.expense.findMany.mockResolvedValue([
+      pendingExpense('expense-1', new Date(2026, 6, 22), 5040.62, 'Despesa A'),
+    ])
+    prismaMock.bill.findMany.mockResolvedValue([
+      pendingBill('bill-1', new Date(2026, 6, 25), 2000, 'Boleto A'),
+    ])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+    prismaMock.account.findMany.mockResolvedValue([
+      account('account-sicoob', 'Sicoob Katia', -3584.13),
+    ])
+
+    const result = await DashboardService.operationalSummary(companyId, { mode: 'current-month' })
+
+    expect(result.summary.expectedBalance).toBe(-5040.62)
+    expect(result.accountBalances.totalCurrentBalance).toBe(-3584.13)
+    expect(result.accountBalances.projectedBalanceAfterPeriod).toBe(-8624.75)
   })
 
   it('mudanca de mes nao altera saldo, status ou ledger financeiro', async () => {

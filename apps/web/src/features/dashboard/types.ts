@@ -184,6 +184,17 @@ export interface DashboardOperationalSummary {
     totalToPay: number
     expectedBalance: number
   }
+  accountBalances: {
+    totalCurrentBalance: number
+    projectedBalanceAfterPeriod: number
+    accounts: Array<{
+      id: string
+      name: string
+      type: string
+      currentBalance: number
+      active: boolean
+    }>
+  }
   nextEvents: {
     nextReceivable: OperationalSummaryItem | null
     nextPayable: OperationalSummaryItem | null

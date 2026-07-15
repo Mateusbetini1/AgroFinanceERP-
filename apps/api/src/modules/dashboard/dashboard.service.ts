@@ -391,7 +391,7 @@ export const DashboardService = {
     const period = getOperationalPeriod(query, now)
     const bounds = { gte: period.start, lt: period.end }
 
-    const [revenues, expenses, bills] = await Promise.all([
+    const [revenues, expenses, bills, accounts] = await Promise.all([
       prisma.revenue.findMany({
         where: {
           companyId,
@@ -444,6 +444,11 @@ export const DashboardService = {
           category: { select: { id: true, name: true } },
           supplier: { select: { id: true, name: true } },
         },
+      }),
+      prisma.account.findMany({
+        where: { companyId, deletedAt: null, active: true },
+        select: { id: true, name: true, type: true, currentBalance: true, active: true },
+        orderBy: { name: 'asc' },
       }),
     ])
 
@@ -524,6 +529,15 @@ export const DashboardService = {
 
     const totalToReceive = receivableItems.reduce((sum, item) => sum + item.amount, 0)
     const totalToPay = payableItems.reduce((sum, item) => sum + item.amount, 0)
+    const expectedBalance = totalToReceive - totalToPay
+    const accountBalances = accounts.map((account) => ({
+      id: account.id,
+      name: account.name,
+      type: account.type,
+      currentBalance: toNumber(account.currentBalance),
+      active: account.active,
+    }))
+    const totalCurrentBalance = accountBalances.reduce((sum, account) => sum + account.currentBalance, 0)
 
     return {
       period: {
@@ -549,7 +563,12 @@ export const DashboardService = {
       summary: {
         totalToReceive,
         totalToPay,
-        expectedBalance: totalToReceive - totalToPay,
+        expectedBalance,
+      },
+      accountBalances: {
+        totalCurrentBalance,
+        projectedBalanceAfterPeriod: totalCurrentBalance + expectedBalance,
+        accounts: accountBalances,
       },
       nextEvents: {
         nextReceivable: receivableItems.find((item) => item.date >= today) ?? null,

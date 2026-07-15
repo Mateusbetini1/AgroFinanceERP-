@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Landmark,
   PlusCircle,
   RefreshCcw,
 } from 'lucide-react'
@@ -21,8 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 import { getDashboardOperationalSummary } from '@/features/dashboard/api'
-import type { OperationalSummaryItem, OperationalSummaryMode } from '@/features/dashboard/types'
-import { cn, formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
+import type { DashboardOperationalSummary, OperationalSummaryItem, OperationalSummaryMode } from '@/features/dashboard/types'
+import { cn, formatAccountType, formatCurrency, formatDate, formatStatusLabel } from '@/lib/utils'
 
 type SummaryTone = 'default' | 'positive' | 'negative' | 'warning'
 
@@ -164,6 +165,101 @@ function AttentionNow({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function AccountBalancesCard({ data }: { data: DashboardOperationalSummary }) {
+  const visibleAccounts = data.accountBalances.accounts.slice(0, 5)
+  const hasMore = data.accountBalances.accounts.length > visibleAccounts.length
+  const totalTone = data.accountBalances.totalCurrentBalance < 0 ? 'text-destructive' : 'text-emerald-700'
+  const projectedTone = data.accountBalances.projectedBalanceAfterPeriod < 0 ? 'text-destructive' : 'text-emerald-700'
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Landmark className="h-4 w-4 text-primary" />
+              Saldos das contas
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Saldo atual das contas = dinheiro/saldo operacional atual.
+            </p>
+          </div>
+          <Link href="/accounts" className="text-sm font-medium text-primary hover:underline">
+            Ver contas
+          </Link>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Total em contas</p>
+            <p className={cn('text-2xl font-semibold tracking-normal', totalTone)}>
+              {formatCurrency(data.accountBalances.totalCurrentBalance)}
+            </p>
+          </div>
+
+          {visibleAccounts.length === 0 ? (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+              Nenhuma conta ativa encontrada.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {visibleAccounts.map((account) => (
+                <div key={account.id} className="grid grid-cols-[1fr_auto] gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{account.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatAccountType(account.type)}</p>
+                  </div>
+                  <p
+                    className={cn(
+                      'shrink-0 text-right text-sm font-semibold',
+                      account.currentBalance < 0 && 'text-destructive',
+                    )}
+                  >
+                    {formatCurrency(account.currentBalance)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {hasMore && <p className="text-xs text-muted-foreground">Mostrando as 5 primeiras contas.</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Saldo projetado apos pendencias</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Saldo projetado = saldo atual + pendencias do periodo.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">Saldo atual das contas</span>
+            <span className={cn('font-semibold', totalTone)}>
+              {formatCurrency(data.accountBalances.totalCurrentBalance)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">Saldo previsto do periodo</span>
+            <span className={cn('font-semibold', data.summary.expectedBalance < 0 && 'text-destructive')}>
+              {formatCurrency(data.summary.expectedBalance)}
+            </span>
+          </div>
+          <div className="border-t border-border pt-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Saldo projetado</p>
+            <p className={cn('text-2xl font-semibold tracking-normal', projectedTone)}>
+              {formatCurrency(data.accountBalances.projectedBalanceAfterPeriod)}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Saldo previsto do periodo = a receber menos a pagar.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -398,6 +494,8 @@ export default function DashboardPage() {
               tone="warning"
             />
           </div>
+
+          <AccountBalancesCard data={query.data} />
 
           <AttentionNow
             overduePayables={query.data.payables.overdueCount}
