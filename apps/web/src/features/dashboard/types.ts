@@ -174,7 +174,7 @@ export interface DashboardOperationalSummary {
     dueTodayCount: number
     items: OperationalSummaryItem[]
   }
-  payablesBreakdown: {
+  payablesBreakdown?: {
     total: number
     payrollTotal: number
     billsTotal: number
@@ -193,10 +193,11 @@ export interface DashboardOperationalSummary {
     totalToReceive: number
     totalToPay: number
     expectedBalance: number
+    projectedBalanceAfterPeriod?: number
   }
-  accountBalances: {
+  accountBalances?: {
     totalCurrentBalance: number
-    projectedBalanceAfterPeriod: number
+    projectedBalanceAfterPeriod?: number
     accounts: Array<{
       id: string
       name: string

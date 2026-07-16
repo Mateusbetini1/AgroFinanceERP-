@@ -39,6 +39,87 @@ const quickActions = [
   { href: '/employee-payments', label: 'Pagamento funcionario' },
 ]
 
+type PayablesBreakdown = NonNullable<DashboardOperationalSummary['payablesBreakdown']>
+type AccountBalances = NonNullable<DashboardOperationalSummary['accountBalances']>
+type SafeAccountBalances = Omit<AccountBalances, 'projectedBalanceAfterPeriod'> & {
+  projectedBalanceAfterPeriod: number
+}
+type LegacySummary = DashboardOperationalSummary['summary'] & {
+  totalPayable?: number
+  payablesTotal?: number
+}
+
+const emptyReceivables = {
+  totalPending: 0,
+  count: 0,
+  overdueCount: 0,
+  dueTodayCount: 0,
+  items: [] as OperationalSummaryItem[],
+}
+
+const emptyPayables = {
+  totalPending: 0,
+  count: 0,
+  overdueCount: 0,
+  dueTodayCount: 0,
+  items: [] as OperationalSummaryItem[],
+}
+
+function numberOrZero(value: unknown) {
+  const numberValue = Number(value ?? 0)
+  return Number.isFinite(numberValue) ? numberValue : 0
+}
+
+function getExpectedBalance(data: DashboardOperationalSummary | undefined) {
+  return numberOrZero(data?.summary?.expectedBalance)
+}
+
+function getPayablesBreakdown(data: DashboardOperationalSummary | undefined): PayablesBreakdown {
+  const items = data?.payables?.items ?? []
+  const legacySummary = data?.summary as LegacySummary | undefined
+  const itemTotal = items.reduce((sum, item) => sum + numberOrZero(item.amount), 0)
+  const payrollItems = items.filter((item) => item.type === 'PAYROLL')
+  const billItems = items.filter((item) => item.type === 'BILL')
+  const expenseItems = items.filter((item) => item.type === 'EXPENSE')
+  const payrollTotal = payrollItems.reduce((sum, item) => sum + numberOrZero(item.amount), 0)
+  const billsTotal = billItems.reduce((sum, item) => sum + numberOrZero(item.amount), 0)
+  const expensesTotal = expenseItems.reduce((sum, item) => sum + numberOrZero(item.amount), 0)
+  const existing = data?.payablesBreakdown
+
+  return {
+    total: numberOrZero(
+      existing?.total ??
+        legacySummary?.totalToPay ??
+        legacySummary?.totalPayable ??
+        legacySummary?.payablesTotal ??
+        data?.payables?.totalPending ??
+        itemTotal,
+    ),
+    payrollTotal: numberOrZero(existing?.payrollTotal ?? payrollTotal),
+    billsTotal: numberOrZero(existing?.billsTotal ?? billsTotal),
+    expensesTotal: numberOrZero(existing?.expensesTotal ?? expensesTotal),
+    miscellaneousTotal: numberOrZero(existing?.miscellaneousTotal ?? billsTotal + expensesTotal),
+    payrollCount: numberOrZero(existing?.payrollCount ?? payrollItems.length),
+    billsCount: numberOrZero(existing?.billsCount ?? billItems.length),
+    expensesCount: numberOrZero(existing?.expensesCount ?? expenseItems.length),
+  }
+}
+
+function getAccountBalances(data: DashboardOperationalSummary | undefined): SafeAccountBalances {
+  const totalCurrentBalance = numberOrZero(data?.accountBalances?.totalCurrentBalance)
+  const projectedBalanceAfterPeriod = numberOrZero(
+    data?.accountBalances?.projectedBalanceAfterPeriod ??
+      data?.summary?.projectedBalanceAfterPeriod ??
+      totalCurrentBalance + getExpectedBalance(data),
+  )
+
+  return {
+    totalCurrentBalance,
+    projectedBalanceAfterPeriod,
+    accounts: data?.accountBalances?.accounts ?? [],
+  }
+}
+
 function SummaryCard({
   title,
   value,
@@ -178,10 +259,10 @@ function AttentionNow({
   )
 }
 
-function AccountBalancesCard({ data }: { data: DashboardOperationalSummary }) {
-  const visibleAccounts = data.accountBalances.accounts.slice(0, 3)
-  const hasMore = data.accountBalances.accounts.length > visibleAccounts.length
-  const totalTone = data.accountBalances.totalCurrentBalance < 0 ? 'text-destructive' : 'text-emerald-700'
+function AccountBalancesCard({ accountBalances }: { accountBalances: SafeAccountBalances }) {
+  const visibleAccounts = accountBalances.accounts.slice(0, 3)
+  const hasMore = accountBalances.accounts.length > visibleAccounts.length
+  const totalTone = accountBalances.totalCurrentBalance < 0 ? 'text-destructive' : 'text-emerald-700'
 
   return (
     <Card>
@@ -203,10 +284,10 @@ function AccountBalancesCard({ data }: { data: DashboardOperationalSummary }) {
         <div>
           <p className="text-xs font-medium uppercase text-muted-foreground">Total atual em contas</p>
           <p className={cn('text-2xl font-semibold tracking-normal', totalTone)}>
-            {formatCurrency(data.accountBalances.totalCurrentBalance)}
+            {formatCurrency(accountBalances.totalCurrentBalance)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Saldo previsto do periodo: {formatCurrency(data.summary.expectedBalance)}
+            Saldo projetado apos periodo: {formatCurrency(accountBalances.projectedBalanceAfterPeriod)}
           </p>
         </div>
 
@@ -333,11 +414,11 @@ function addMonthsToDate(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1)
 }
 
-function PayableItemsCard({ data }: { data: DashboardOperationalSummary }) {
+function PayableItemsCard({ breakdown, count }: { breakdown: PayablesBreakdown; count: number }) {
   const items = [
-    { label: 'Folha', value: data.payablesBreakdown.payrollCount, href: '/employee-payments' },
-    { label: 'Boletos', value: data.payablesBreakdown.billsCount, href: '/bills' },
-    { label: 'Despesas', value: data.payablesBreakdown.expensesCount, href: '/expenses' },
+    { label: 'Folha', value: breakdown.payrollCount, href: '/employee-payments' },
+    { label: 'Boletos', value: breakdown.billsCount, href: '/bills' },
+    { label: 'Despesas', value: breakdown.expensesCount, href: '/expenses' },
   ]
 
   return (
@@ -349,7 +430,7 @@ function PayableItemsCard({ data }: { data: DashboardOperationalSummary }) {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-2xl font-semibold tracking-normal">{data.payables.count}</p>
+        <p className="text-2xl font-semibold tracking-normal">{count}</p>
         <div className="mt-2 grid gap-1">
           {items.map((item) => (
             <Link
@@ -380,12 +461,24 @@ export default function DashboardPage() {
       }),
   })
 
-  const balanceTone = (query.data?.summary.expectedBalance ?? 0) >= 0 ? 'positive' : 'negative'
+  const dashboard = query.data
+  const receivables = dashboard?.receivables ?? emptyReceivables
+  const payables = dashboard?.payables ?? emptyPayables
+  const receivableItems = receivables.items ?? []
+  const payableItems = payables.items ?? []
+  const receivablesCount = numberOrZero(receivables.count ?? receivableItems.length)
+  const payablesCount = numberOrZero(payables.count ?? payableItems.length)
+  const payablesBreakdown = getPayablesBreakdown(dashboard)
+  const accountBalances = getAccountBalances(dashboard)
+  const expectedBalance = getExpectedBalance(dashboard)
+  const totalToReceive = numberOrZero(dashboard?.summary?.totalToReceive ?? receivables.totalPending)
+  const nextEvents = dashboard?.nextEvents ?? { nextReceivable: null, nextPayable: null }
+  const balanceTone = expectedBalance >= 0 ? 'positive' : 'negative'
   const periodLabel =
     mode === 'current-month'
       ? getMonthTitle(selectedMonth)
-      : query.data
-        ? `${formatDate(query.data.period.startDate)} a ${formatDate(query.data.period.endDate)}`
+      : dashboard?.period?.startDate && dashboard?.period?.endDate
+        ? `${formatDate(dashboard.period.startDate)} a ${formatDate(dashboard.period.endDate)}`
         : 'Hoje a +30 dias'
 
   return (
@@ -463,77 +556,77 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {query.data && (
+      {dashboard && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
             <SummaryCard
               title="A receber"
-              value={formatCurrency(query.data.summary.totalToReceive)}
-              detail={`${query.data.receivables.count} pendente(s)`}
+              value={formatCurrency(totalToReceive)}
+              detail={`${receivablesCount} pendente(s)`}
               icon={ArrowUpCircle}
               tone="positive"
             />
             <SummaryCard
               title="A pagar total"
-              value={formatCurrency(query.data.payablesBreakdown.total)}
+              value={formatCurrency(payablesBreakdown.total)}
               detail="Diversos + folha"
               icon={ArrowDownCircle}
               tone="negative"
             />
             <SummaryCard
               title="Pagamentos diversos"
-              value={formatCurrency(query.data.payablesBreakdown.miscellaneousTotal)}
+              value={formatCurrency(payablesBreakdown.miscellaneousTotal)}
               detail="Boletos + despesas"
               icon={ArrowDownCircle}
               tone="warning"
             />
             <SummaryCard
               title="Folha do mes"
-              value={formatCurrency(query.data.payablesBreakdown.payrollTotal)}
-              detail={`${query.data.payablesBreakdown.payrollCount} folha(s) em aberto`}
+              value={formatCurrency(payablesBreakdown.payrollTotal)}
+              detail={`${payablesBreakdown.payrollCount} folha(s) em aberto`}
               icon={Banknote}
               href="/employee-payments"
               tone="negative"
             />
             <SummaryCard
               title="Saldo previsto"
-              value={formatCurrency(query.data.summary.expectedBalance)}
+              value={formatCurrency(expectedBalance)}
               detail="A receber menos a pagar"
               icon={Banknote}
               tone={balanceTone}
             />
             <SummaryCard
               title="Recebimentos"
-              value={String(query.data.receivables.count)}
+              value={String(receivablesCount)}
               detail="Itens em aberto"
               icon={CalendarClock}
             />
-            <PayableItemsCard data={query.data} />
+            <PayableItemsCard breakdown={payablesBreakdown} count={payablesCount} />
           </div>
 
-          <AccountBalancesCard data={query.data} />
+          <AccountBalancesCard accountBalances={accountBalances} />
 
           <AttentionNow
-            overduePayables={query.data.payables.overdueCount}
-            dueTodayPayables={query.data.payables.dueTodayCount}
-            overdueReceivables={query.data.receivables.overdueCount}
-            dueTodayReceivables={query.data.receivables.dueTodayCount}
-            nextPayable={query.data.nextEvents.nextPayable}
-            nextReceivable={query.data.nextEvents.nextReceivable}
+            overduePayables={numberOrZero(payables.overdueCount)}
+            dueTodayPayables={numberOrZero(payables.dueTodayCount)}
+            overdueReceivables={numberOrZero(receivables.overdueCount)}
+            dueTodayReceivables={numberOrZero(receivables.dueTodayCount)}
+            nextPayable={nextEvents.nextPayable ?? null}
+            nextReceivable={nextEvents.nextReceivable ?? null}
           />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <PendingList
               title="A receber"
-              items={query.data.receivables.items}
-              count={query.data.receivables.count}
+              items={receivableItems}
+              count={receivablesCount}
               emptyText="Nenhum recebimento pendente no periodo."
               href="/revenues"
             />
             <PendingList
               title="A pagar"
-              items={query.data.payables.items}
-              count={query.data.payables.count}
+              items={payableItems}
+              count={payablesCount}
               emptyText="Nenhum pagamento pendente no periodo."
               href="/expenses"
             />
