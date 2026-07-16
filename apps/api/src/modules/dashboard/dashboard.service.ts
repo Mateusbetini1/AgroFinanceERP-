@@ -529,6 +529,19 @@ export const DashboardService = {
 
     const totalToReceive = receivableItems.reduce((sum, item) => sum + item.amount, 0)
     const totalToPay = payableItems.reduce((sum, item) => sum + item.amount, 0)
+    const payrollTotal = payableItems
+      .filter((item) => item.type === 'PAYROLL')
+      .reduce((sum, item) => sum + item.amount, 0)
+    const billsTotal = payableItems
+      .filter((item) => item.type === 'BILL')
+      .reduce((sum, item) => sum + item.amount, 0)
+    const expensesTotal = payableItems
+      .filter((item) => item.type === 'EXPENSE')
+      .reduce((sum, item) => sum + item.amount, 0)
+    const payrollCount = payableItems.filter((item) => item.type === 'PAYROLL').length
+    const billsCount = payableItems.filter((item) => item.type === 'BILL').length
+    const expensesCount = payableItems.filter((item) => item.type === 'EXPENSE').length
+    const miscellaneousTotal = billsTotal + expensesTotal
     const expectedBalance = totalToReceive - totalToPay
     const accountBalances = accounts.map((account) => ({
       id: account.id,
@@ -558,6 +571,16 @@ export const DashboardService = {
         overdueCount: payableItems.filter((item) => item.isOverdue).length,
         dueTodayCount: payableItems.filter((item) => item.isToday).length,
         items: payableItems,
+      },
+      payablesBreakdown: {
+        total: totalToPay,
+        payrollTotal,
+        billsTotal,
+        expensesTotal,
+        miscellaneousTotal,
+        payrollCount,
+        billsCount,
+        expensesCount,
       },
       payroll,
       summary: {

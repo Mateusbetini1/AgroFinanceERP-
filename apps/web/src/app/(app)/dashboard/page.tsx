@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { useState, type ComponentType } from 'react'
+import { useState, type ComponentType, type ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,12 +44,14 @@ function SummaryCard({
   value,
   detail,
   icon: Icon,
+  href,
   tone = 'default',
 }: {
   title: string
   value: string
-  detail?: string
+  detail?: ReactNode
   icon: ComponentType<{ className?: string }>
+  href?: string
   tone?: SummaryTone
 }) {
   const toneClass = {
@@ -59,8 +61,8 @@ function SummaryCard({
     warning: 'bg-amber-100 text-amber-700',
   }[tone]
 
-  return (
-    <Card>
+  const card = (
+    <Card className={cn(href && 'transition-colors hover:bg-muted/30')}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <div className={cn('rounded-md p-2', toneClass)}>
@@ -72,6 +74,14 @@ function SummaryCard({
         {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
+  )
+
+  if (!href) return card
+
+  return (
+    <Link href={href} className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+      {card}
+    </Link>
   )
 }
 
@@ -323,12 +333,38 @@ function addMonthsToDate(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1)
 }
 
-function payableBreakdown(items: OperationalSummaryItem[]) {
-  const payroll = items.filter((item) => item.type === 'PAYROLL').length
-  const bills = items.filter((item) => item.type === 'BILL').length
-  const expenses = items.filter((item) => item.type === 'EXPENSE').length
+function PayableItemsCard({ data }: { data: DashboardOperationalSummary }) {
+  const items = [
+    { label: 'Folha', value: data.payablesBreakdown.payrollCount, href: '/employee-payments' },
+    { label: 'Boletos', value: data.payablesBreakdown.billsCount, href: '/bills' },
+    { label: 'Despesas', value: data.payablesBreakdown.expensesCount, href: '/expenses' },
+  ]
 
-  return `Folha: ${payroll} · Boletos: ${bills} · Despesas: ${expenses}`
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Itens a pagar</CardTitle>
+        <div className="rounded-md bg-amber-100 p-2 text-amber-700">
+          <Clock3 className="h-4 w-4" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-semibold tracking-normal">{data.payables.count}</p>
+        <div className="mt-2 grid gap-1">
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center justify-between rounded-md px-2 py-1 text-xs transition-colors hover:bg-muted"
+            >
+              <span className="text-muted-foreground">{item.label}</span>
+              <span className="font-medium text-foreground">{item.value}</span>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function DashboardPage() {
@@ -429,7 +465,7 @@ export default function DashboardPage() {
 
       {query.data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
             <SummaryCard
               title="A receber"
               value={formatCurrency(query.data.summary.totalToReceive)}
@@ -438,10 +474,25 @@ export default function DashboardPage() {
               tone="positive"
             />
             <SummaryCard
-              title="A pagar"
-              value={formatCurrency(query.data.summary.totalToPay)}
-              detail={`${query.data.payables.count} pendente(s)`}
+              title="A pagar total"
+              value={formatCurrency(query.data.payablesBreakdown.total)}
+              detail="Diversos + folha"
               icon={ArrowDownCircle}
+              tone="negative"
+            />
+            <SummaryCard
+              title="Pagamentos diversos"
+              value={formatCurrency(query.data.payablesBreakdown.miscellaneousTotal)}
+              detail="Boletos + despesas"
+              icon={ArrowDownCircle}
+              tone="warning"
+            />
+            <SummaryCard
+              title="Folha do mes"
+              value={formatCurrency(query.data.payablesBreakdown.payrollTotal)}
+              detail={`${query.data.payablesBreakdown.payrollCount} folha(s) em aberto`}
+              icon={Banknote}
+              href="/employee-payments"
               tone="negative"
             />
             <SummaryCard
@@ -457,13 +508,7 @@ export default function DashboardPage() {
               detail="Itens em aberto"
               icon={CalendarClock}
             />
-            <SummaryCard
-              title="Itens a pagar"
-              value={String(query.data.payables.count)}
-              detail={payableBreakdown(query.data.payables.items)}
-              icon={Clock3}
-              tone="warning"
-            />
+            <PayableItemsCard data={query.data} />
           </div>
 
           <AccountBalancesCard data={query.data} />

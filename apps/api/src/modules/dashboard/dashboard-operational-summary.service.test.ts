@@ -125,6 +125,16 @@ describe('DashboardService.operationalSummary', () => {
     expect(result.summary.totalToReceive).toBe(2000)
     expect(result.summary.totalToPay).toBe(2300)
     expect(result.summary.expectedBalance).toBe(-300)
+    expect(result.payablesBreakdown).toEqual({
+      total: 2300,
+      payrollTotal: 1500,
+      billsTotal: 500,
+      expensesTotal: 300,
+      miscellaneousTotal: 800,
+      payrollCount: 1,
+      billsCount: 1,
+      expensesCount: 1,
+    })
     expect(result.accountBalances.projectedBalanceAfterPeriod).toBe(-300)
     expect(result.receivables.count).toBe(2)
     expect(result.payables.count).toBe(3)
@@ -281,6 +291,48 @@ describe('DashboardService.operationalSummary', () => {
     expect(result.summary.expectedBalance).toBe(-5040.62)
     expect(result.accountBalances.totalCurrentBalance).toBe(-3584.13)
     expect(result.accountBalances.projectedBalanceAfterPeriod).toBe(-8624.75)
+  })
+
+  it('separa pagamentos diversos e folha mantendo o total geral a pagar', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([])
+    prismaMock.expense.findMany.mockResolvedValue([
+      pendingExpense('expense-1', new Date(2026, 6, 16), 400, 'Despesa A'),
+      pendingExpense('expense-2', new Date(2026, 6, 17), 250, 'Despesa B'),
+    ])
+    prismaMock.bill.findMany.mockResolvedValue([
+      pendingBill('bill-1', new Date(2026, 6, 18), 900, 'Boleto A'),
+      pendingBill('bill-2', new Date(2026, 6, 19), 1100, 'Boleto B'),
+    ])
+    prismaMock.employee.findMany.mockResolvedValue([
+      { id: 'employee-1', name: 'Joao', type: 'MONTHLY', baseSalary: 2500 },
+    ])
+    prismaMock.employeePayment.findMany.mockResolvedValue([
+      {
+        employeeId: 'employee-1',
+        type: 'ADVANCE',
+        amount: 700,
+        employee: { id: 'employee-1', name: 'Joao', type: 'MONTHLY', baseSalary: 2500 },
+      },
+    ])
+
+    const result = await DashboardService.operationalSummary(companyId, { mode: 'current-month' })
+
+    expect(result.summary.totalToPay).toBe(4450)
+    expect(result.payablesBreakdown).toEqual({
+      total: 4450,
+      payrollTotal: 1800,
+      billsTotal: 2000,
+      expensesTotal: 650,
+      miscellaneousTotal: 2650,
+      payrollCount: 1,
+      billsCount: 2,
+      expensesCount: 2,
+    })
+    expect(result.payroll).toEqual({ expected: 2500, paid: 700, remaining: 1800 })
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    expect(prismaMock.expense.update).not.toHaveBeenCalled()
+    expect(prismaMock.bill.update).not.toHaveBeenCalled()
   })
 
   it('mudanca de mes nao altera saldo, status ou ledger financeiro', async () => {

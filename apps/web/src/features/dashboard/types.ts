@@ -174,6 +174,16 @@ export interface DashboardOperationalSummary {
     dueTodayCount: number
     items: OperationalSummaryItem[]
   }
+  payablesBreakdown: {
+    total: number
+    payrollTotal: number
+    billsTotal: number
+    expensesTotal: number
+    miscellaneousTotal: number
+    payrollCount: number
+    billsCount: number
+    expensesCount: number
+  }
   payroll: {
     expected: number
     paid: number
