@@ -20,6 +20,8 @@ export interface RevenueFilters {
   safraId?: string
   dateFrom?: string
   dateTo?: string
+  page?: number
+  limit?: number
 }
 
 function cleanCreateRevenuePayload(payload: RevenuePayload): RevenuePayload {

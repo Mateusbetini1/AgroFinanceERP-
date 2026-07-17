@@ -22,6 +22,8 @@ export interface BillFilters {
   safraId?: string
   dateFrom?: string
   dateTo?: string
+  page?: number
+  limit?: number
 }
 
 export interface BillInstallmentsPayload {

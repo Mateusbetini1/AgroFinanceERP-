@@ -21,6 +21,8 @@ export interface ExpenseFilters {
   safraId?: string
   dateFrom?: string
   dateTo?: string
+  page?: number
+  limit?: number
 }
 
 function cleanCreateExpensePayload(payload: ExpensePayload): ExpensePayload {

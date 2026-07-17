@@ -7,6 +7,7 @@ import { CalendarPlus, ListChecks, Plus } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListFilters } from '@/components/data/list-filters'
+import { ListPagination } from '@/components/data/list-pagination'
 import { ListPage } from '@/components/data/list-page'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +37,7 @@ type BillFilterState = {
 }
 
 const initialFilters: BillFilterState = { search: '', status: '', safraId: '', month: '' }
+const pageSize = 20
 
 function monthBounds(month: string) {
   if (!month) return {}
@@ -58,15 +60,18 @@ export default function BillsPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<BillFilterState>(initialFilters)
   const [searchInput, setSearchInput] = useState(initialFilters.search)
+  const [page, setPage] = useState(1)
   const apiFilters = cleanFilters(filters)
+  const queryParams = { ...apiFilters, page, limit: pageSize }
   const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
-  const query = useQuery({ queryKey: ['bills', apiFilters], queryFn: () => listBills(apiFilters) })
+  const query = useQuery({ queryKey: ['bills', queryParams], queryFn: () => listBills(queryParams) })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
 
   const bills = query.data?.data ?? []
+  const pagination = query.data?.meta
   const suppliers = suppliersQuery.data?.data ?? []
   const accounts = accountsQuery.data?.data ?? []
   const categories = categoriesQuery.data?.data ?? []
@@ -79,6 +84,7 @@ export default function BillsPage() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setPage(1)
       setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
     }, 400)
 
@@ -161,8 +167,14 @@ export default function BillsPage() {
   }
 
   function clearFilters() {
+    setPage(1)
     setSearchInput(initialFilters.search)
     setFilters(initialFilters)
+  }
+
+  function updateFilters(updater: (current: BillFilterState) => BillFilterState) {
+    setPage(1)
+    setFilters(updater)
   }
 
   const isAuxLoading = suppliersQuery.isLoading || accountsQuery.isLoading || categoriesQuery.isLoading || safrasQuery.isLoading
@@ -210,7 +222,7 @@ export default function BillsPage() {
               <Select
                 id="bill-status"
                 value={filters.status}
-                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as BillFilterState['status'] }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, status: event.target.value as BillFilterState['status'] }))}
               >
                 <option value="">Todos</option>
                 <option value="PENDING">Pendentes</option>
@@ -223,7 +235,7 @@ export default function BillsPage() {
               <Select
                 id="bill-safra"
                 value={filters.safraId}
-                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, safraId: event.target.value }))}
               >
                 <option value="">Todas</option>
                 {safras.map((safra) => (
@@ -239,7 +251,7 @@ export default function BillsPage() {
                 id="bill-month"
                 type="month"
                 value={filters.month}
-                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, month: event.target.value }))}
               />
             </div>
           </ListFilters>
@@ -288,7 +300,20 @@ export default function BillsPage() {
               {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhum boleto encontrado.'}
             </div>
           ) : (
-            <BillsTable bills={bills} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+            <>
+              <BillsTable bills={bills} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+              {pagination && (
+                <ListPagination
+                  page={pagination.page}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  totalPages={pagination.totalPages}
+                  isFetching={query.isFetching}
+                  itemLabel="boletos"
+                  onPageChange={setPage}
+                />
+              )}
+            </>
           )}
         </div>
         </ListPage>

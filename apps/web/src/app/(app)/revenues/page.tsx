@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListFilters } from '@/components/data/list-filters'
+import { ListPagination } from '@/components/data/list-pagination'
 import { ListPage } from '@/components/data/list-page'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,19 +44,23 @@ function cleanFilters(filters: RevenueFilterState) {
 }
 
 const initialFilters: RevenueFilterState = { search: '', status: '', safraId: '', month: '' }
+const pageSize = 20
 
 export default function RevenuesPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<RevenueFilterState>(initialFilters)
   const [searchInput, setSearchInput] = useState(initialFilters.search)
+  const [page, setPage] = useState(1)
   const apiFilters = cleanFilters(filters)
+  const queryParams = { ...apiFilters, page, limit: pageSize }
   const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
-  const query = useQuery({ queryKey: ['revenues', apiFilters], queryFn: () => listRevenues(apiFilters) })
+  const query = useQuery({ queryKey: ['revenues', queryParams], queryFn: () => listRevenues(queryParams) })
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
   const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
 
   const revenues = query.data?.data ?? []
+  const pagination = query.data?.meta
   const products = productsQuery.data?.data ?? []
   const accounts = accountsQuery.data?.data ?? []
   const safras = safrasQuery.data?.data ?? []
@@ -67,6 +72,7 @@ export default function RevenuesPage() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setPage(1)
       setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
     }, 400)
 
@@ -134,8 +140,14 @@ export default function RevenuesPage() {
   }
 
   function clearFilters() {
+    setPage(1)
     setSearchInput(initialFilters.search)
     setFilters(initialFilters)
+  }
+
+  function updateFilters(updater: (current: RevenueFilterState) => RevenueFilterState) {
+    setPage(1)
+    setFilters(updater)
   }
 
   const isAuxLoading = productsQuery.isLoading || accountsQuery.isLoading || safrasQuery.isLoading
@@ -169,7 +181,7 @@ export default function RevenuesPage() {
               <Select
                 id="revenue-status"
                 value={filters.status}
-                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as RevenueFilterState['status'] }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, status: event.target.value as RevenueFilterState['status'] }))}
               >
                 <option value="">Todos</option>
                 <option value="PENDING">Pendentes</option>
@@ -181,7 +193,7 @@ export default function RevenuesPage() {
               <Select
                 id="revenue-safra"
                 value={filters.safraId}
-                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, safraId: event.target.value }))}
               >
                 <option value="">Todas</option>
                 {safras.map((safra) => (
@@ -197,7 +209,7 @@ export default function RevenuesPage() {
                 id="revenue-month"
                 type="month"
                 value={filters.month}
-                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, month: event.target.value }))}
               />
             </div>
           </ListFilters>
@@ -212,7 +224,20 @@ export default function RevenuesPage() {
               {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhuma receita encontrada.'}
             </div>
           ) : (
-            <RevenuesTable revenues={revenues} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+            <>
+              <RevenuesTable revenues={revenues} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+              {pagination && (
+                <ListPagination
+                  page={pagination.page}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  totalPages={pagination.totalPages}
+                  isFetching={query.isFetching}
+                  itemLabel="receitas"
+                  onPageChange={setPage}
+                />
+              )}
+            </>
           )}
         </div>
       </ListPage>

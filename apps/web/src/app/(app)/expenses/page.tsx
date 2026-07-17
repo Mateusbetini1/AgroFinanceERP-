@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog } from '@/components/ui/dialog'
 import { InlineAlert } from '@/components/feedback/inline-alert'
 import { ListFilters } from '@/components/data/list-filters'
+import { ListPagination } from '@/components/data/list-pagination'
 import { ListPage } from '@/components/data/list-page'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,6 +28,7 @@ type ExpenseFilterState = {
 }
 
 const initialFilters: ExpenseFilterState = { search: '', status: '', safraId: '', month: '' }
+const pageSize = 20
 
 function monthBounds(month: string) {
   if (!month) return {}
@@ -49,15 +51,18 @@ export default function ExpensesPage() {
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<ExpenseFilterState>(initialFilters)
   const [searchInput, setSearchInput] = useState(initialFilters.search)
+  const [page, setPage] = useState(1)
   const apiFilters = cleanFilters(filters)
+  const queryParams = { ...apiFilters, page, limit: pageSize }
   const hasActiveFilters = Object.keys(apiFilters).length > 0 || searchInput.trim().length > 0
-  const query = useQuery({ queryKey: ['expenses', apiFilters], queryFn: () => listExpenses(apiFilters) })
+  const query = useQuery({ queryKey: ['expenses', queryParams], queryFn: () => listExpenses(queryParams) })
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: listCategories })
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers })
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: listAccounts })
   const safrasQuery = useQuery({ queryKey: ['safras'], queryFn: listSafras })
 
   const expenses = query.data?.data ?? []
+  const pagination = query.data?.meta
   const categories = categoriesQuery.data?.data ?? []
   const suppliers = suppliersQuery.data?.data ?? []
   const accounts = accountsQuery.data?.data ?? []
@@ -70,6 +75,7 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setPage(1)
       setFilters((current) => (current.search === searchInput ? current : { ...current, search: searchInput }))
     }, 400)
 
@@ -137,8 +143,14 @@ export default function ExpensesPage() {
   }
 
   function clearFilters() {
+    setPage(1)
     setSearchInput(initialFilters.search)
     setFilters(initialFilters)
+  }
+
+  function updateFilters(updater: (current: ExpenseFilterState) => ExpenseFilterState) {
+    setPage(1)
+    setFilters(updater)
   }
 
   const isAuxLoading =
@@ -174,7 +186,7 @@ export default function ExpensesPage() {
               <Select
                 id="expense-status"
                 value={filters.status}
-                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ExpenseFilterState['status'] }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, status: event.target.value as ExpenseFilterState['status'] }))}
               >
                 <option value="">Todos</option>
                 <option value="PENDING">Pendentes</option>
@@ -187,7 +199,7 @@ export default function ExpensesPage() {
               <Select
                 id="expense-safra"
                 value={filters.safraId}
-                onChange={(event) => setFilters((current) => ({ ...current, safraId: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, safraId: event.target.value }))}
               >
                 <option value="">Todas</option>
                 {safras.map((safra) => (
@@ -203,7 +215,7 @@ export default function ExpensesPage() {
                 id="expense-month"
                 type="month"
                 value={filters.month}
-                onChange={(event) => setFilters((current) => ({ ...current, month: event.target.value }))}
+                onChange={(event) => updateFilters((current) => ({ ...current, month: event.target.value }))}
               />
             </div>
           </ListFilters>
@@ -219,7 +231,20 @@ export default function ExpensesPage() {
               {hasActiveFilters ? 'Nenhum registro encontrado com os filtros atuais.' : 'Nenhuma despesa encontrada.'}
             </div>
           ) : (
-            <ExpensesTable expenses={expenses} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+            <>
+              <ExpensesTable expenses={expenses} deletingId={deletingId} onEdit={openEdit} onDelete={handleDelete} />
+              {pagination && (
+                <ListPagination
+                  page={pagination.page}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  totalPages={pagination.totalPages}
+                  isFetching={query.isFetching}
+                  itemLabel="despesas"
+                  onPageChange={setPage}
+                />
+              )}
+            </>
           )}
         </div>
       </ListPage>
