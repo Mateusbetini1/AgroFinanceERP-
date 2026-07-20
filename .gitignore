@@ -56,3 +56,6 @@ Thumbs.db
 # Prisma local sqlite files, if ever used locally
 *.db
 *.db-journal
+
+.vercel
+.env*
