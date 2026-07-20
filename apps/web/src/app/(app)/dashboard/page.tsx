@@ -41,6 +41,7 @@ const quickActions = [
 
 type PayablesBreakdown = NonNullable<DashboardOperationalSummary['payablesBreakdown']>
 type AccountBalances = NonNullable<DashboardOperationalSummary['accountBalances']>
+type ActualsSummary = NonNullable<DashboardOperationalSummary['actualsSummary']>
 type SafeAccountBalances = Omit<AccountBalances, 'projectedBalanceAfterPeriod'> & {
   projectedBalanceAfterPeriod: number
 }
@@ -63,6 +64,20 @@ const emptyPayables = {
   overdueCount: 0,
   dueTodayCount: 0,
   items: [] as OperationalSummaryItem[],
+}
+
+const emptyActualsSummary: ActualsSummary = {
+  receivedTotal: 0,
+  receivedCount: 0,
+  paidTotal: 0,
+  paidCount: 0,
+  paidBillsTotal: 0,
+  paidBillsCount: 0,
+  paidExpensesTotal: 0,
+  paidExpensesCount: 0,
+  employeePaymentsTotal: 0,
+  employeePaymentsCount: 0,
+  netActualResult: 0,
 }
 
 function numberOrZero(value: unknown) {
@@ -117,6 +132,24 @@ function getAccountBalances(data: DashboardOperationalSummary | undefined): Safe
     totalCurrentBalance,
     projectedBalanceAfterPeriod,
     accounts: data?.accountBalances?.accounts ?? [],
+  }
+}
+
+function getActualsSummary(data: DashboardOperationalSummary | undefined): ActualsSummary {
+  const actuals = data?.actualsSummary
+
+  return {
+    receivedTotal: numberOrZero(actuals?.receivedTotal),
+    receivedCount: numberOrZero(actuals?.receivedCount),
+    paidTotal: numberOrZero(actuals?.paidTotal),
+    paidCount: numberOrZero(actuals?.paidCount),
+    paidBillsTotal: numberOrZero(actuals?.paidBillsTotal),
+    paidBillsCount: numberOrZero(actuals?.paidBillsCount),
+    paidExpensesTotal: numberOrZero(actuals?.paidExpensesTotal),
+    paidExpensesCount: numberOrZero(actuals?.paidExpensesCount),
+    employeePaymentsTotal: numberOrZero(actuals?.employeePaymentsTotal),
+    employeePaymentsCount: numberOrZero(actuals?.employeePaymentsCount),
+    netActualResult: numberOrZero(actuals?.netActualResult),
   }
 }
 
@@ -470,6 +503,7 @@ export default function DashboardPage() {
   const payablesCount = numberOrZero(payables.count ?? payableItems.length)
   const payablesBreakdown = getPayablesBreakdown(dashboard)
   const accountBalances = getAccountBalances(dashboard)
+  const actualsSummary = dashboard ? getActualsSummary(dashboard) : emptyActualsSummary
   const expectedBalance = getExpectedBalance(dashboard)
   const totalToReceive = numberOrZero(dashboard?.summary?.totalToReceive ?? receivables.totalPending)
   const nextEvents = dashboard?.nextEvents ?? { nextReceivable: null, nextPayable: null }
@@ -558,50 +592,85 @@ export default function DashboardPage() {
 
       {dashboard && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-            <SummaryCard
-              title="A receber"
-              value={formatCurrency(totalToReceive)}
-              detail={`${receivablesCount} pendente(s)`}
-              icon={ArrowUpCircle}
-              tone="positive"
-            />
-            <SummaryCard
-              title="A pagar total"
-              value={formatCurrency(payablesBreakdown.total)}
-              detail="Diversos + folha"
-              icon={ArrowDownCircle}
-              tone="negative"
-            />
-            <SummaryCard
-              title="Pagamentos diversos"
-              value={formatCurrency(payablesBreakdown.miscellaneousTotal)}
-              detail="Boletos + despesas"
-              icon={ArrowDownCircle}
-              tone="warning"
-            />
-            <SummaryCard
-              title="Folha do mes"
-              value={formatCurrency(payablesBreakdown.payrollTotal)}
-              detail={`${payablesBreakdown.payrollCount} folha(s) em aberto`}
-              icon={Banknote}
-              href="/employee-payments"
-              tone="negative"
-            />
-            <SummaryCard
-              title="Saldo previsto"
-              value={formatCurrency(expectedBalance)}
-              detail="A receber menos a pagar"
-              icon={Banknote}
-              tone={balanceTone}
-            />
-            <SummaryCard
-              title="Recebimentos"
-              value={String(receivablesCount)}
-              detail="Itens em aberto"
-              icon={CalendarClock}
-            />
-            <PayableItemsCard breakdown={payablesBreakdown} count={payablesCount} />
+          <section className="space-y-3" aria-labelledby="actuals-summary-title">
+            <div>
+              <h2 id="actuals-summary-title" className="text-base font-semibold text-foreground">
+                Realizado no m&ecirc;s
+              </h2>
+              <p className="text-xs text-muted-foreground">Entradas e sa&iacute;das efetivadas no m&ecirc;s de refer&ecirc;ncia.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <SummaryCard
+                title={'Recebido no m\u00eas'}
+                value={formatCurrency(actualsSummary.receivedTotal)}
+                detail={`${actualsSummary.receivedCount} recebimento(s)`}
+                icon={ArrowUpCircle}
+                tone="positive"
+              />
+              <SummaryCard
+                title={'Pago no m\u00eas'}
+                value={formatCurrency(actualsSummary.paidTotal)}
+                detail={`Boletos ${actualsSummary.paidBillsCount} \u00b7 Despesas ${actualsSummary.paidExpensesCount} \u00b7 Funcion\u00e1rios ${actualsSummary.employeePaymentsCount}`}
+                icon={ArrowDownCircle}
+                tone="negative"
+              />
+              <SummaryCard
+                title="Resultado realizado"
+                value={formatCurrency(actualsSummary.netActualResult)}
+                detail="Recebido menos pago"
+                icon={CheckCircle2}
+                tone={actualsSummary.netActualResult >= 0 ? 'positive' : 'negative'}
+              />
+            </div>
+          </section>
+
+          <div>
+            <h2 className="mb-3 text-base font-semibold text-foreground">Pend&ecirc;ncias em aberto</h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+              <SummaryCard
+                title="A receber em aberto"
+                value={formatCurrency(totalToReceive)}
+                detail={`${receivablesCount} pendente(s)`}
+                icon={ArrowUpCircle}
+                tone="positive"
+              />
+              <SummaryCard
+                title="A pagar em aberto"
+                value={formatCurrency(payablesBreakdown.total)}
+                detail="Diversos + folha"
+                icon={ArrowDownCircle}
+                tone="negative"
+              />
+              <SummaryCard
+                title="Pagamentos diversos em aberto"
+                value={formatCurrency(payablesBreakdown.miscellaneousTotal)}
+                detail="Boletos + despesas"
+                icon={ArrowDownCircle}
+                tone="warning"
+              />
+              <SummaryCard
+                title={'Folha do m\u00eas em aberto'}
+                value={formatCurrency(payablesBreakdown.payrollTotal)}
+                detail={`${payablesBreakdown.payrollCount} folha(s) em aberto`}
+                icon={Banknote}
+                href="/employee-payments"
+                tone="negative"
+              />
+              <SummaryCard
+                title="Saldo previsto"
+                value={formatCurrency(expectedBalance)}
+                detail="A receber menos a pagar"
+                icon={Banknote}
+                tone={balanceTone}
+              />
+              <SummaryCard
+                title="Recebimentos em aberto"
+                value={String(receivablesCount)}
+                detail="Itens em aberto"
+                icon={CalendarClock}
+              />
+              <PayableItemsCard breakdown={payablesBreakdown} count={payablesCount} />
+            </div>
           </div>
 
           <AccountBalancesCard accountBalances={accountBalances} />
@@ -617,14 +686,14 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 xl:grid-cols-2">
             <PendingList
-              title="A receber"
+              title="A receber em aberto"
               items={receivableItems}
               count={receivablesCount}
               emptyText="Nenhum recebimento pendente no periodo."
               href="/revenues"
             />
             <PendingList
-              title="A pagar"
+              title="A pagar em aberto"
               items={payableItems}
               count={payablesCount}
               emptyText="Nenhum pagamento pendente no periodo."

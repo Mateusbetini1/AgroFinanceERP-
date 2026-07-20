@@ -189,6 +189,19 @@ export interface DashboardOperationalSummary {
     paid: number
     remaining: number
   }
+  actualsSummary?: {
+    receivedTotal: number
+    receivedCount: number
+    paidTotal: number
+    paidCount: number
+    paidBillsTotal: number
+    paidBillsCount: number
+    paidExpensesTotal: number
+    paidExpensesCount: number
+    employeePaymentsTotal: number
+    employeePaymentsCount: number
+    netActualResult: number
+  }
   summary: {
     totalToReceive: number
     totalToPay: number

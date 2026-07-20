@@ -52,12 +52,20 @@ function account(id: string, name: string, currentBalance: number, active = true
   }
 }
 
+function actualAggregate(field: 'totalAmount' | 'amount', total = 0, count = 0) {
+  return { _sum: { [field]: total }, _count: count }
+}
+
 describe('DashboardService.operationalSummary', () => {
   beforeEach(() => {
     resetPrismaMock()
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 6, 14, 10, 0, 0))
     prismaMock.account.findMany.mockResolvedValue([])
+    prismaMock.revenue.aggregate.mockResolvedValue(actualAggregate('totalAmount'))
+    prismaMock.expense.aggregate.mockResolvedValue(actualAggregate('amount'))
+    prismaMock.bill.aggregate.mockResolvedValue(actualAggregate('amount'))
+    prismaMock.employeePayment.aggregate.mockResolvedValue(actualAggregate('amount'))
   })
 
   it('ordena receitas e calcula vencido/proximo recebimento pela data prevista de recebimento', async () => {
@@ -195,6 +203,72 @@ describe('DashboardService.operationalSummary', () => {
         where: expect.objectContaining({ referenceMonth: 8, referenceYear: 2026 }),
       }),
     )
+  })
+
+  it('resume recebidos e pagamentos realizados usando somente as datas operacionais do mes e da empresa', async () => {
+    prismaMock.revenue.findMany.mockResolvedValue([])
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+    prismaMock.revenue.aggregate.mockResolvedValue(actualAggregate('totalAmount', 10559.38, 3))
+    prismaMock.expense.aggregate.mockResolvedValue(actualAggregate('amount', 400, 2))
+    prismaMock.bill.aggregate.mockResolvedValue(actualAggregate('amount', 900, 1))
+    prismaMock.employeePayment.aggregate.mockResolvedValue(actualAggregate('amount', 700, 2))
+
+    const result = await DashboardService.operationalSummary(companyId, {
+      mode: 'current-month',
+      month: 7,
+      year: 2026,
+    })
+    const monthBounds = { gte: new Date(2026, 6, 1), lt: new Date(2026, 7, 1) }
+
+    expect(prismaMock.revenue.aggregate).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: 'RECEIVED',
+        receivedAt: monthBounds,
+      },
+      _sum: { totalAmount: true },
+      _count: true,
+    })
+    expect(prismaMock.expense.aggregate).toHaveBeenCalledWith({
+      where: { companyId, deletedAt: null, status: 'PAID', paidAt: monthBounds },
+      _sum: { amount: true },
+      _count: true,
+    })
+    expect(prismaMock.bill.aggregate).toHaveBeenCalledWith({
+      where: { companyId, deletedAt: null, status: 'PAID', paidAt: monthBounds },
+      _sum: { amount: true },
+      _count: true,
+    })
+    expect(prismaMock.employeePayment.aggregate).toHaveBeenCalledWith({
+      where: { companyId, deletedAt: null, date: monthBounds },
+      _sum: { amount: true },
+      _count: true,
+    })
+    expect(result.actualsSummary).toEqual({
+      receivedTotal: 10559.38,
+      receivedCount: 3,
+      paidTotal: 2000,
+      paidCount: 5,
+      paidBillsTotal: 900,
+      paidBillsCount: 1,
+      paidExpensesTotal: 400,
+      paidExpensesCount: 2,
+      employeePaymentsTotal: 700,
+      employeePaymentsCount: 2,
+      netActualResult: 8559.38,
+    })
+    expect(prismaMock.transfer.aggregate).not.toHaveBeenCalled()
+    expect(prismaMock.transfer.findMany).not.toHaveBeenCalled()
+    expect(prismaMock.account.update).not.toHaveBeenCalled()
+    expect(prismaMock.revenue.update).not.toHaveBeenCalled()
+    expect(prismaMock.expense.update).not.toHaveBeenCalled()
+    expect(prismaMock.bill.update).not.toHaveBeenCalled()
+    expect(prismaMock.employeePayment.update).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
   })
 
   it('usa proximos 30 dias como periodo ate 13/08 e mantem somente itens em aberto nas consultas', async () => {

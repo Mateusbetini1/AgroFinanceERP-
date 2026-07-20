@@ -391,7 +391,22 @@ export const DashboardService = {
     const period = getOperationalPeriod(query, now)
     const bounds = { gte: period.start, lt: period.end }
 
-    const [revenues, expenses, bills, accounts] = await Promise.all([
+    const actualsPeriod = getOperationalPeriod(
+      { mode: 'current-month', month: query.month, year: query.year },
+      now,
+    )
+    const actualsBounds = { gte: actualsPeriod.start, lt: actualsPeriod.end }
+
+    const [
+      revenues,
+      expenses,
+      bills,
+      accounts,
+      receivedActuals,
+      paidExpenseActuals,
+      paidBillActuals,
+      employeePaymentActuals,
+    ] = await Promise.all([
       prisma.revenue.findMany({
         where: {
           companyId,
@@ -449,6 +464,45 @@ export const DashboardService = {
         where: { companyId, deletedAt: null, active: true },
         select: { id: true, name: true, type: true, currentBalance: true, active: true },
         orderBy: { name: 'asc' },
+      }),
+      prisma.revenue.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'RECEIVED',
+          receivedAt: actualsBounds,
+        },
+        _sum: { totalAmount: true },
+        _count: true,
+      }),
+      prisma.expense.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PAID',
+          paidAt: actualsBounds,
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.bill.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          status: 'PAID',
+          paidAt: actualsBounds,
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.employeePayment.aggregate({
+        where: {
+          companyId,
+          deletedAt: null,
+          date: actualsBounds,
+        },
+        _sum: { amount: true },
+        _count: true,
       }),
     ])
 
@@ -551,6 +605,11 @@ export const DashboardService = {
       active: account.active,
     }))
     const totalCurrentBalance = accountBalances.reduce((sum, account) => sum + account.currentBalance, 0)
+    const receivedTotal = toNumber(receivedActuals._sum.totalAmount)
+    const paidExpensesTotal = toNumber(paidExpenseActuals._sum.amount)
+    const paidBillsTotal = toNumber(paidBillActuals._sum.amount)
+    const employeePaymentsTotal = toNumber(employeePaymentActuals._sum.amount)
+    const paidTotal = paidExpensesTotal + paidBillsTotal + employeePaymentsTotal
 
     return {
       period: {
@@ -583,6 +642,19 @@ export const DashboardService = {
         expensesCount,
       },
       payroll,
+      actualsSummary: {
+        receivedTotal,
+        receivedCount: receivedActuals._count,
+        paidTotal,
+        paidCount: paidExpenseActuals._count + paidBillActuals._count + employeePaymentActuals._count,
+        paidBillsTotal,
+        paidBillsCount: paidBillActuals._count,
+        paidExpensesTotal,
+        paidExpensesCount: paidExpenseActuals._count,
+        employeePaymentsTotal,
+        employeePaymentsCount: employeePaymentActuals._count,
+        netActualResult: receivedTotal - paidTotal,
+      },
       summary: {
         totalToReceive,
         totalToPay,
