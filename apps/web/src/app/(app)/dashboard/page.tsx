@@ -504,10 +504,11 @@ export default function DashboardPage() {
   const payablesBreakdown = getPayablesBreakdown(dashboard)
   const accountBalances = getAccountBalances(dashboard)
   const actualsSummary = dashboard ? getActualsSummary(dashboard) : emptyActualsSummary
-  const expectedBalance = getExpectedBalance(dashboard)
+  const pendingResult = getExpectedBalance(dashboard)
+  const expectedMonthResult = actualsSummary.netActualResult + pendingResult
   const totalToReceive = numberOrZero(dashboard?.summary?.totalToReceive ?? receivables.totalPending)
   const nextEvents = dashboard?.nextEvents ?? { nextReceivable: null, nextPayable: null }
-  const balanceTone = expectedBalance >= 0 ? 'positive' : 'negative'
+  const pendingResultTone = pendingResult >= 0 ? 'positive' : 'negative'
   const periodLabel =
     mode === 'current-month'
       ? getMonthTitle(selectedMonth)
@@ -599,7 +600,7 @@ export default function DashboardPage() {
               </h2>
               <p className="text-xs text-muted-foreground">Entradas e sa&iacute;das efetivadas no m&ecirc;s de refer&ecirc;ncia.</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard
                 title={'Recebido no m\u00eas'}
                 value={formatCurrency(actualsSummary.receivedTotal)}
@@ -620,6 +621,13 @@ export default function DashboardPage() {
                 detail="Recebido menos pago"
                 icon={CheckCircle2}
                 tone={actualsSummary.netActualResult >= 0 ? 'positive' : 'negative'}
+              />
+              <SummaryCard
+                title={'Resultado esperado do m\u00eas'}
+                value={formatCurrency(expectedMonthResult)}
+                detail={'Realizado + pend\u00eancias em aberto'}
+                icon={Banknote}
+                tone={expectedMonthResult >= 0 ? 'positive' : 'negative'}
               />
             </div>
           </section>
@@ -657,11 +665,11 @@ export default function DashboardPage() {
                 tone="negative"
               />
               <SummaryCard
-                title="Saldo previsto"
-                value={formatCurrency(expectedBalance)}
-                detail="A receber menos a pagar"
+                title="Resultado pendente"
+                value={formatCurrency(pendingResult)}
+                detail="A receber em aberto menos a pagar em aberto"
                 icon={Banknote}
-                tone={balanceTone}
+                tone={pendingResultTone}
               />
               <SummaryCard
                 title="Recebimentos em aberto"
