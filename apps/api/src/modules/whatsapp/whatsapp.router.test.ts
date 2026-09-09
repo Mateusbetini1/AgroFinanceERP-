@@ -1,13 +1,15 @@
 import { createHmac } from 'node:crypto'
 import request from 'supertest'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../app'
 import { env } from '../../config/env'
+import { logger } from '../../config/logger'
 import { enqueueWhatsAppMessages } from './whatsapp.service'
 
 vi.mock('./whatsapp.service', () => ({ enqueueWhatsAppMessages: vi.fn() }))
 
 describe('WhatsApp webhook', () => {
+  afterEach(() => vi.restoreAllMocks())
   beforeEach(() => {
     Object.assign(env, { WHATSAPP_ENABLED: true, WHATSAPP_ACCESS_TOKEN: 'token', WHATSAPP_APP_SECRET: 'secret',
       WHATSAPP_VERIFY_TOKEN: 'verify', WHATSAPP_PHONE_NUMBER_ID: '12345', WHATSAPP_GRAPH_VERSION: 'v25.0',
@@ -58,5 +60,19 @@ describe('WhatsApp webhook', () => {
   it('fica indisponível quando desativado', async () => {
     env.WHATSAPP_ENABLED = false
     await post(JSON.stringify(payload())).expect(404)
+  })
+  it('registra chegada e motivo de filtragem sem tokens, números ou texto da conversa', async () => {
+    const log = vi.spyOn(logger, 'info')
+    env.WHATSAPP_VERIFY_TOKEN = 'private-verification-token'
+    await request(createApp()).get('/api/v1/webhooks/whatsapp').query({
+      'hub.mode': 'subscribe', 'hub.verify_token': env.WHATSAPP_VERIFY_TOKEN, 'hub.challenge': 'private-challenge',
+    }).expect(200)
+    await post(JSON.stringify(payload('5511888888888'))).expect(200)
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ unauthorizedSender: 1, accepted: 0 }),
+      'WhatsApp: eventos recebidos e filtrados')
+    const output = JSON.stringify(log.mock.calls)
+    for (const secret of ['private-verification-token', 'private-challenge', '5511888888888', 'Quanto tenho a pagar?']) {
+      expect(output).not.toContain(secret)
+    }
   })
 })

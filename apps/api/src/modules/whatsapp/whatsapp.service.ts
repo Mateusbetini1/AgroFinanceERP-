@@ -15,10 +15,13 @@ const CLEAR_DRAFT = { draft: Prisma.DbNull, draftCode: null, draftExpiresAt: nul
 const INTERRUPTED_REPLY = 'O processamento foi interrompido. Por segurança, não repeti a operação. Confira os lançamentos no painel antes de tentar novamente.'
 const HELP = 'Posso consultar suas finanças e preparar receitas, despesas, boletos, parcelamentos e pagamentos de funcionários. Envie texto, áudio, foto, PDF ou vídeo curto (até 10 MB). Para salvar, revise o rascunho e digite CONFIRMAR seguido do código. CANCELAR descarta o rascunho. Não realizo pagamentos bancários.'
 
-export async function resolveWhatsAppIdentity(config: WhatsAppConfig) {
+export async function resolveWhatsAppIdentity(config: WhatsAppConfig, reportProblems = false) {
   const user = await prisma.user.findUnique({ where: { email: config.userEmail },
     select: { id: true, email: true } })
-  if (!user) return null
+  if (!user) {
+    if (reportProblems) logger.warn('WhatsApp: usuário não encontrado. Confira WHATSAPP_USER_EMAIL com o login do AgroFinance')
+    return null
+  }
   const memberships = await prisma.membership.findMany({
     where: { userId: user.id, active: true,
       ...(config.companyId ? { companyId: config.companyId } : {}),
@@ -26,7 +29,12 @@ export async function resolveWhatsAppIdentity(config: WhatsAppConfig) {
     select: { role: true, company: { select: { id: true, name: true } } }, take: 2,
   })
   // Never guess a tenant when the user belongs to several companies.
-  if (memberships.length !== 1) return null
+  if (memberships.length !== 1) {
+    if (reportProblems) logger.warn(memberships.length === 0
+      ? 'WhatsApp: usuário sem vínculo ativo com a empresa. Confira WHATSAPP_COMPANY_ID e permissões'
+      : 'WhatsApp: mais de uma empresa ativa. Preencha WHATSAPP_COMPANY_ID')
+    return null
+  }
   const membership = memberships[0]!
   const sessionId = createHash('sha256').update(
     `${config.phoneNumberId}:${config.allowedPhone}:${user.id}:${membership.company.id}`,
@@ -38,21 +46,25 @@ type Identity = NonNullable<Awaited<ReturnType<typeof resolveWhatsAppIdentity>>>
 
 export async function enqueueWhatsAppMessages(config: WhatsAppConfig, messages: IncomingMessage[]) {
   if (!messages.length) return
-  const identity = await resolveWhatsAppIdentity(config)
+  const identity = await resolveWhatsAppIdentity(config, true)
   if (!identity) return
   const now = Date.now()
   const accepted = messages.filter((message) => message.from === config.allowedPhone &&
     Number(message.timestamp) * 1000 >= now - 24 * 60 * 60 * 1000 &&
     Number(message.timestamp) * 1000 <= now + 5 * 60 * 1000)
-  if (!accepted.length) return
+  if (!accepted.length) {
+    logger.warn('WhatsApp: nenhuma mensagem elegível; confira remetente e horário do evento')
+    return
+  }
   await prisma.whatsAppSession.upsert({ where: { id: identity.sessionId },
     create: { id: identity.sessionId }, update: {} })
-  await prisma.whatsAppMessage.createMany({
+  const inserted = await prisma.whatsAppMessage.createMany({
     data: accepted.map((message) => ({ id: message.id, sessionId: identity.sessionId,
       receivedAt: new Date(Number(message.timestamp) * 1000),
       payload: message as Prisma.InputJsonValue })),
     skipDuplicates: true,
   })
+  logger.info({ inserted: inserted.count, eligible: accepted.length }, 'WhatsApp: mensagens persistidas na fila')
 }
 
 async function clearDraft(sessionId: string) {
@@ -206,6 +218,7 @@ export async function processWhatsAppQueue() {
       orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
     })
     if (!next) return
+    logger.info({ messageId: next.id, status: next.status }, 'WhatsApp: processando fila')
     if (next.receivedAt.getTime() < Date.now() - 23 * 60 * 60 * 1000) {
       await prisma.whatsAppMessage.update({ where: { id: next.id },
         data: { status: 'EXPIRED', payload: Prisma.DbNull, reply: null } })
@@ -243,6 +256,7 @@ export async function processWhatsAppQueue() {
     }
     await prisma.whatsAppMessage.update({ where: { id: next.id },
       data: { status: 'DONE', reply: null, nextSendAt: null } })
+    logger.info({ messageId: next.id }, 'WhatsApp: resposta aceita pela API da Meta')
   } finally {
     await prisma.whatsAppSession.updateMany({ where: { id: identity.sessionId, lockToken: token },
       data: { lockToken: null, lockedUntil: null } })
@@ -265,6 +279,7 @@ export function startWhatsAppWorker() {
       .finally(() => { running = undefined })
   }
   const timer = setInterval(tick, 2000)
+  logger.info('WhatsApp: worker iniciado')
   timer.unref()
   tick()
   return async () => { clearInterval(timer); await running }
