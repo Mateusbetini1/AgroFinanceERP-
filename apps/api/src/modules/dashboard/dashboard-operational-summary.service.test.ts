@@ -228,18 +228,18 @@ describe('DashboardService.operationalSummary', () => {
         companyId,
         deletedAt: null,
         status: 'RECEIVED',
-        receivedAt: monthBounds,
+        OR: [{ receivedAt: monthBounds }, { receivedAt: null, date: monthBounds }],
       },
       _sum: { totalAmount: true },
       _count: true,
     })
     expect(prismaMock.expense.aggregate).toHaveBeenCalledWith({
-      where: { companyId, deletedAt: null, status: 'PAID', paidAt: monthBounds },
+      where: { companyId, deletedAt: null, status: 'PAID', OR: [{ paidAt: monthBounds }, { paidAt: null, date: monthBounds }] },
       _sum: { amount: true },
       _count: true,
     })
     expect(prismaMock.bill.aggregate).toHaveBeenCalledWith({
-      where: { companyId, deletedAt: null, status: 'PAID', paidAt: monthBounds },
+      where: { companyId, deletedAt: null, status: 'PAID', OR: [{ paidAt: monthBounds }, { paidAt: null, dueDate: monthBounds }] },
       _sum: { amount: true },
       _count: true,
     })
@@ -269,6 +269,51 @@ describe('DashboardService.operationalSummary', () => {
     expect(prismaMock.bill.update).not.toHaveBeenCalled()
     expect(prismaMock.employeePayment.update).not.toHaveBeenCalled()
     expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['revenue', 'RECEIVED', 'receivedAt', 'date', 'totalAmount', 'receivedTotal'],
+    ['expense', 'PAID', 'paidAt', 'date', 'amount', 'paidExpensesTotal'],
+    ['bill', 'PAID', 'paidAt', 'dueDate', 'amount', 'paidBillsTotal'],
+  ] as const)('inclui %s sem data de baixa e respeita baixas fora do mes', async (model, status, settlementField, fallbackField, amountField, totalField) => {
+    prismaMock.revenue.findMany.mockResolvedValue([])
+    prismaMock.expense.findMany.mockResolvedValue([])
+    prismaMock.bill.findMany.mockResolvedValue([])
+    prismaMock.employee.findMany.mockResolvedValue([])
+    prismaMock.employeePayment.findMany.mockResolvedValue([])
+
+    const august = new Date(2026, 7, 15)
+    const september = new Date(2026, 8, 1)
+    const base = { companyId, deletedAt: null, status }
+    const rows = [
+      { ...base, [settlementField]: null, [fallbackField]: august, [amountField]: 100 },
+      { ...base, [settlementField]: august, [fallbackField]: september, [amountField]: 200 },
+      { ...base, [settlementField]: september, [fallbackField]: august, [amountField]: 400 },
+      { ...base, [settlementField]: null, [fallbackField]: september, [amountField]: 800 },
+      { ...base, status: 'PENDING', [settlementField]: null, [fallbackField]: august, [amountField]: 1600 },
+      { ...base, companyId: 'other-company', [settlementField]: null, [fallbackField]: august, [amountField]: 3200 },
+      { ...base, deletedAt: august, [settlementField]: null, [fallbackField]: august, [amountField]: 6400 },
+    ]
+    // Evaluate the actual query against dated records, including month boundaries.
+    function matches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
+      return Object.entries(where).every(([key, condition]) => {
+        if (key === 'OR') return (condition as Record<string, unknown>[]).some((branch) => matches(row, branch))
+        if (condition && typeof condition === 'object') {
+          const bounds = condition as { gte: Date; lt: Date }
+          return row[key] instanceof Date && row[key] >= bounds.gte && row[key] < bounds.lt
+        }
+        return row[key] === condition
+      })
+    }
+    prismaMock[model].aggregate.mockImplementation(async ({ where }) => {
+      const included = rows.filter((row) => matches(row, where))
+      return actualAggregate(amountField, included.reduce((sum, row) => sum + Number(row[amountField]), 0), included.length)
+    })
+
+    const result = await DashboardService.operationalSummary(companyId, { mode: 'current-month', month: 8, year: 2026 })
+
+    expect(result.actualsSummary[totalField]).toBe(300)
+    expect(model === 'revenue' ? result.actualsSummary.receivedCount : result.actualsSummary.paidCount).toBe(2)
   })
 
   it('usa proximos 30 dias como periodo ate 13/08 e mantem somente itens em aberto nas consultas', async () => {
