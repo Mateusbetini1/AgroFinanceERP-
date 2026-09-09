@@ -175,6 +175,7 @@ uma mensagem interpretada pela IA pode estar incorreta.
 
 | Sintoma | Conferir |
 | --- | --- |
+| Log informa WhatsApp desativado por configuração inválida | Corrija as variáveis indicadas em `reason` e reinicie/reimplante a API; o restante do sistema continua disponível |
 | Webhook retorna 404 | `WHATSAPP_ENABLED`, URL da API e deploy atualizado |
 | Verificação retorna 403 | Verify Token idêntico na Meta e no Render |
 | POST retorna 401 | App Secret e assinatura da Meta |

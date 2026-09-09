@@ -42,7 +42,7 @@ const envSchema = z.object({
   WHATSAPP_APP_SECRET: z.string().optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
-  WHATSAPP_GRAPH_VERSION: z.string().regex(/^v\d+\.0$/).optional(),
+  WHATSAPP_GRAPH_VERSION: z.string().optional(),
   WHATSAPP_ALLOWED_PHONE: z.string().optional(),
   WHATSAPP_USER_EMAIL: z.string().optional(),
   WHATSAPP_COMPANY_ID: z.string().optional(),

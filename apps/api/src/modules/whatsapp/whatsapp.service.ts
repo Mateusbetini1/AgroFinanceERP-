@@ -5,7 +5,7 @@ import { prisma } from '../../config/prisma'
 import { logger } from '../../config/logger'
 import { AssistantService, withMissingFields } from '../assistant/assistant.service'
 import { assistantDraftSchema, type AssistantDraft } from '../assistant/assistant.schemas'
-import { getWhatsAppConfig, type WhatsAppConfig } from './whatsapp.config'
+import { getWhatsAppConfig, WhatsAppConfigurationError, type WhatsAppConfig } from './whatsapp.config'
 import { incomingMessageSchema, type IncomingMessage } from './whatsapp.schemas'
 import { interpretWhatsAppMedia, sendWhatsAppReply, WhatsAppInputError } from './whatsapp.client'
 
@@ -250,7 +250,13 @@ export async function processWhatsAppQueue() {
 }
 
 export function startWhatsAppWorker() {
-  if (!getWhatsAppConfig()) return async () => undefined
+  try {
+    if (!getWhatsAppConfig()) return async () => undefined
+  } catch (error) {
+    if (!(error instanceof WhatsAppConfigurationError)) throw error
+    logger.error({ reason: error.message }, 'WhatsApp desativado por configuração inválida; API permanece disponível')
+    return async () => undefined
+  }
   let running: Promise<void> | undefined
   const tick = () => {
     if (running) return
