@@ -145,6 +145,37 @@ enum FarmLocationType {
   @@map("farm_location_type")
 }
 
+// Durable personal WhatsApp inbox. Business records are still created by the
+// existing financial services, using the authorized membership of the sender.
+model WhatsAppSession {
+  id           String    @id
+  draft        Json?
+  draftCode    String?   @map("draft_code")
+  draftExpiresAt DateTime? @map("draft_expires_at")
+  draftUserId  String?   @map("draft_user_id")
+  draftCompanyId String? @map("draft_company_id")
+  lockToken    String?   @map("lock_token")
+  lockedUntil  DateTime? @map("locked_until")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("whatsapp_sessions")
+}
+
+model WhatsAppMessage {
+  id           String    @id
+  sessionId    String    @map("session_id")
+  payload      Json?
+  status       String    @default("PENDING")
+  reply        String?
+  sendAttempts Int       @default(0) @map("send_attempts")
+  nextSendAt   DateTime? @map("next_send_at")
+  receivedAt   DateTime  @default(now()) @map("received_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([sessionId, status, receivedAt])
+  @@map("whatsapp_messages")
+}
+
 enum SupplyCategory {
   DEFENSIVE
   FERTILIZER

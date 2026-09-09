@@ -2,12 +2,14 @@ import { createApp } from './app'
 import { env } from './config/env'
 import { prisma } from './config/prisma'
 import { logger } from './config/logger'
+import { startWhatsAppWorker } from './modules/whatsapp/whatsapp.service'
 
 async function bootstrap(): Promise<void> {
   await prisma.$connect()
   logger.info('Banco de dados conectado')
 
   const app = createApp()
+  const stopWhatsAppWorker = startWhatsAppWorker()
 
   const server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API iniciada')
@@ -17,6 +19,7 @@ async function bootstrap(): Promise<void> {
     logger.info({ signal }, 'Encerrando servidor...')
 
     server.close(async () => {
+      await stopWhatsAppWorker()
       await prisma.$disconnect()
       logger.info('Servidor encerrado com sucesso')
       process.exit(0)

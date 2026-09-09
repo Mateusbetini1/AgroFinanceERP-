@@ -4,6 +4,7 @@ function createModelMock() {
   return {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
     createMany: vi.fn(),
@@ -26,6 +27,8 @@ export const prismaMock = {
   $disconnect: vi.fn(),
   $transaction: vi.fn(),
   user: createModelMock(),
+  whatsAppSession: createModelMock(),
+  whatsAppMessage: createModelMock(),
   company: createModelMock(),
   membership: createModelMock(),
   refreshToken: createModelMock(),

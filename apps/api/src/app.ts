@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit'
 import { env } from './config/env'
 import { errorHandler } from './shared/middleware/error-handler'
 import { requestLogger } from './shared/middleware/request-logger'
+import { whatsappRouter } from './modules/whatsapp/whatsapp.router'
 
 // Routers — importar conforme módulos forem implementados
 import { authRouter } from './modules/auth/auth.router'
@@ -76,6 +77,7 @@ export function createApp() {
   })
 
   // ── Body parsing ────────────────────────────────────────────
+  app.use('/api/v1/webhooks/whatsapp', whatsappRouter)
   app.use(express.json({ limit: '10mb' }))
   app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 

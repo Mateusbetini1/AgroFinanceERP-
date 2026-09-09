@@ -36,6 +36,18 @@ const envSchema = z.object({
   AI_MODEL: z.string().default('gemini-1.5-flash'),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
+  // Personal WhatsApp integration (disabled until configured).
+  WHATSAPP_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_GRAPH_VERSION: z.string().regex(/^v\d+\.0$/).optional(),
+  WHATSAPP_ALLOWED_PHONE: z.string().optional(),
+  WHATSAPP_USER_EMAIL: z.string().optional(),
+  WHATSAPP_COMPANY_ID: z.string().optional(),
+  WHATSAPP_MEDIA_MODEL: z.string().default('gemini-2.5-flash'),
+
   // Web Push
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),

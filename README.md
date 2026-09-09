@@ -34,6 +34,15 @@ Implemented backend modules:
 - Reports v2
 - AuditLog
 
+## WhatsApp pessoal
+
+Integração opcional com a API oficial da Meta para consultar o assistente e
+preparar lançamentos por texto, áudio, foto, PDF ou vídeo curto. Gravações exigem
+confirmação por código; somente o número autorizado pode usar a integração.
+
+Consulte [Configurar WhatsApp no Render](docs/whatsapp.md). A integração vem
+desativada e requer a migração da fila, credenciais da Meta e do Gemini.
+
 ## Main Commands
 
 Install dependencies:

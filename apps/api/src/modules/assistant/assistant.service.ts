@@ -471,7 +471,7 @@ function getRequiredMissingFields(draft: AssistantDraft) {
   return missing
 }
 
-function withMissingFields(draft: AssistantDraft): AssistantDraft {
+export function withMissingFields(draft: AssistantDraft): AssistantDraft {
   return {
     ...draft,
     missingFields: [...new Set(getRequiredMissingFields(draft))],
