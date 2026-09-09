@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -92,6 +93,11 @@ export default function LoginPage() {
             Entrar
           </Button>
         </form>
+        <nav aria-label="Informações legais" className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+          <Link href="/privacidade" className="underline underline-offset-4">Privacidade</Link>
+          <Link href="/termos" className="underline underline-offset-4">Termos</Link>
+          <Link href="/exclusao-de-dados" className="underline underline-offset-4">Exclusão de dados</Link>
+        </nav>
       </CardContent>
     </Card>
   )

@@ -132,6 +132,23 @@ com o App Secret antes de aceitar a mensagem.
 
 ## 5. Testar no seu celular
 
+### Páginas públicas para as configurações do aplicativo
+
+O frontend inclui `/privacidade`, `/termos` e `/exclusao-de-dados`, acessíveis
+sem login. Revise os textos e o contato público em
+`apps/web/src/components/legal/legal-page.tsx` antes de publicar na Vercel.
+As instruções de exclusão utilizam atendimento manual por e-mail, não um
+callback automático de exclusão. O responsável pelo serviço deve acompanhar
+esse canal e atender às solicitações conforme o caso.
+
+Após o deploy do frontend, abra cada página em uma janela sem login. Nas
+configurações básicas da Meta, informe os respectivos endereços completos e
+selecione **URL de instruções de exclusão de dados** para a terceira página.
+Esses textos não garantem aprovação pela Meta nem substituem a revisão das
+práticas efetivas do responsável pelo serviço.
+
+### Conversa de teste
+
 1. Envie `AJUDA` do seu número autorizado para o número de teste/robô.
 2. Pergunte `Quanto tenho para pagar esta semana?` e compare com o painel.
 3. Envie `Criar boleto de R$ 10,00 com vencimento em 20/10/2026, descrição teste`.
